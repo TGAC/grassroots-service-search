@@ -45,7 +45,9 @@ INCLUDES = \
 	
 SRCS 	= \
 	search_service.c \
-		
+	search_service_data.c \
+
+
 CPPFLAGS += -DSEARCH_SERVICE_EXPORTS 
 
 

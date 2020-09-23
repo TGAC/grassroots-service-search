@@ -32,16 +32,17 @@
 
 #include "lucene_tool.h"
 #include "key_value_pair.h"
+#include "mongodb_tool.h"
 
 /*
  * Static declarations
  */
 
 
-static NamedParameterType S_KEYWORD = { "FT Keyword Search", PT_KEYWORD };
-static NamedParameterType S_FACET = { "FT Facet", PT_STRING };
-static NamedParameterType S_PAGE_NUMBER = { "FT Results Page Number", PT_UNSIGNED_INT };
-static NamedParameterType S_PAGE_SIZE = { "FT Results Page Size", PT_UNSIGNED_INT };
+static NamedParameterType S_KEYWORD = { "SS Keyword Search", PT_KEYWORD };
+static NamedParameterType S_FACET = { "SS Facet", PT_STRING };
+static NamedParameterType S_PAGE_NUMBER = { "SS Results Page Number", PT_UNSIGNED_INT };
+static NamedParameterType S_PAGE_SIZE = { "SS Results Page Size", PT_UNSIGNED_INT };
 
 static const char * const S_ANY_FACET_S = "<ANY>";
 
@@ -49,6 +50,8 @@ static const char * const S_ANY_FACET_S = "<ANY>";
 static const uint32 S_DEFAULT_PAGE_NUMBER = 0;
 static const uint32 S_DEFAULT_PAGE_SIZE = 10;
 
+
+static const char * const S_ANY_FACET_S = "<ANY>";
 
 static const char *GetSearchServiceName (const Service *service_p);
 
@@ -74,20 +77,20 @@ static bool CloseSearchService (Service *service_p);
 static ServiceMetadata *GetSearchServiceMetadata (Service *service_p);
 
 
-static void SearchFieldTrialsForKeyword (const char *keyword_s, const char *facet_s, const uint32 page_number, const uint32 page_size, ServiceJob *job_p, const ViewFormat fmt, FieldTrialServiceData *data_p);
+static void SearchKeyword (const char *keyword_s, const char *facet_s, const uint32 page_number, const uint32 page_size, ServiceJob *job_p, SearchServiceData *data_p);
 
 
 static bool AddResultsFromLuceneResults (LuceneDocument *document_p, const uint32 index, void *data_p);
 
-static Parameter *AddFacetParameter (ParameterSet *params_p, ParameterGroup *group_p, FieldTrialServiceData *data_p);
+static Parameter *AddFacetParameter (ParameterSet *params_p, ParameterGroup *group_p, SearchServiceData *data_p);
 
 
 typedef struct
 {
-	FieldTrialServiceData *sd_service_data_p;
+	SearchServiceData *sd_service_data_p;
 	ServiceJob *sd_job_p;
-	ViewFormat sd_format;
 } SearchData;
+
 
 
 /*
@@ -101,7 +104,7 @@ Service *GetSearchService (GrassrootsServer *grassroots_p)
 
 	if (service_p)
 		{
-			FieldTrialServiceData *data_p = AllocateFieldTrialServiceData ();
+			SearchServiceData *data_p = AllocateSearchServiceData ();
 
 			if (data_p)
 				{
@@ -132,7 +135,7 @@ Service *GetSearchService (GrassrootsServer *grassroots_p)
 
 						}		/* if (InitialiseService (.... */
 
-					FreeFieldTrialServiceData (data_p);
+					FreeSearchServiceData (data_p);
 				}
 
 			FreeMemory (service_p);
@@ -167,16 +170,16 @@ static const char *GetSearchServiceInformationUri (const Service *service_p)
 
 	if (!url_s)
 		{
-			url_s = "https://grassroots.tools/docs/user/services/field_trial/search_portal.md";
+			url_s = "https://grassroots.tools/docs/user/services/search/search.md";
 		}
 
 	return url_s;
 }
 
 
-static Parameter *AddFacetParameter (ParameterSet *params_p, ParameterGroup *group_p, FieldTrialServiceData *data_p)
+static Parameter *AddFacetParameter (ParameterSet *params_p, ParameterGroup *group_p, SearchServiceData *data_p)
 {
-	StringParameter *param_p = (StringParameter *) EasyCreateAndAddStringParameterToParameterSet (& (data_p -> dftsd_base_data), params_p, group_p, S_FACET.npt_type, S_FACET.npt_name_s, "Type", "The type of data to search for", S_ANY_FACET_S, PL_ALL);
+	StringParameter *param_p = (StringParameter *) EasyCreateAndAddStringParameterToParameterSet (& (data_p -> ssd_base_data), params_p, group_p, S_FACET.npt_type, S_FACET.npt_name_s, "Type", "The type of data to search for", S_ANY_FACET_S, PL_ALL);
 
 	if (param_p)
 		{
@@ -196,30 +199,30 @@ static ParameterSet *GetSearchServiceParameters (Service *service_p, Resource * 
 
 	if (params_p)
 		{
-			FieldTrialServiceData *data_p = (FieldTrialServiceData *) service_p -> se_data_p;
+			SearchServiceData *data_p = (SearchServiceData *) service_p -> se_data_p;
 			ParameterGroup *group_p = NULL;
 			Parameter *param_p = NULL;
 
-			if ((param_p = EasyCreateAndAddStringParameterToParameterSet (& (data_p -> dftsd_base_data), params_p, group_p, S_KEYWORD.npt_type, S_KEYWORD.npt_name_s, "Search", "Search the field trial data", NULL, PL_SIMPLE)) != NULL)
+			if ((param_p = EasyCreateAndAddStringParameterToParameterSet (& (data_p -> ssd_base_data), params_p, group_p, S_KEYWORD.npt_type, S_KEYWORD.npt_name_s, "Search", "Search the field trial data", NULL, PL_SIMPLE)) != NULL)
 				{
 					if (AddFacetParameter (params_p, group_p, data_p))
 						{
 							uint32 def = S_DEFAULT_PAGE_NUMBER;
 
-							if ((param_p = EasyCreateAndAddUnsignedIntParameterToParameterSet (& (data_p -> dftsd_base_data), params_p, group_p, S_PAGE_NUMBER.npt_name_s, "Page", "The number of the results page to get", &def, PL_SIMPLE)) != NULL)
+							if ((param_p = EasyCreateAndAddUnsignedIntParameterToParameterSet (& (data_p -> ssd_base_data), params_p, group_p, S_PAGE_NUMBER.npt_name_s, "Page", "The number of the results page to get", &def, PL_SIMPLE)) != NULL)
 								{
 									def = S_DEFAULT_PAGE_SIZE;
 
-									if ((param_p = EasyCreateAndAddUnsignedIntParameterToParameterSet (& (data_p -> dftsd_base_data), params_p, group_p, S_PAGE_SIZE.npt_name_s, "Page size", "The maximum number of results on each page", &def, PL_SIMPLE)) != NULL)
+									if ((param_p = EasyCreateAndAddUnsignedIntParameterToParameterSet (& (data_p -> ssd_base_data), params_p, group_p, S_PAGE_SIZE.npt_name_s, "Page size", "The maximum number of results on each page", &def, PL_SIMPLE)) != NULL)
 										{
 											return params_p;
-										}		/* if ((param_p = EasyCreateAndAddParameterToParameterSet (& (data_p -> dftsd_base_data), params_p, group_p, S_PAGE_SIZE.npt_type, S_PAGE_SIZE.npt_name_s, "Page size", "The maximum number of results on each page", def, PL_SIMPLE)) != NULL) */
+										}		/* if ((param_p = EasyCreateAndAddParameterToParameterSet (& (data_p -> ssd_base_data), params_p, group_p, S_PAGE_SIZE.npt_type, S_PAGE_SIZE.npt_name_s, "Page size", "The maximum number of results on each page", def, PL_SIMPLE)) != NULL) */
 									else
 										{
 											PrintErrors (STM_LEVEL_SEVERE, __FILE__, __LINE__, "Failed to add %s parameter", S_PAGE_SIZE.npt_name_s);
 										}
 
-								}		/* if ((param_p = EasyCreateAndAddParameterToParameterSet (& (data_p -> dftsd_base_data), params_p, group_p, S_PAGE_NUMBER.npt_type, S_PAGE_NUMBER.npt_name_s, "Page", "The page of results to get", def, PL_SIMPLE)) != NULL) */
+								}		/* if ((param_p = EasyCreateAndAddParameterToParameterSet (& (data_p -> ssd_base_data), params_p, group_p, S_PAGE_NUMBER.npt_type, S_PAGE_NUMBER.npt_name_s, "Page", "The page of results to get", def, PL_SIMPLE)) != NULL) */
 							else
 								{
 									PrintErrors (STM_LEVEL_SEVERE, __FILE__, __LINE__, "Failed to add %s parameter", S_PAGE_NUMBER.npt_name_s);
@@ -289,7 +292,7 @@ static bool CloseSearchService (Service *service_p)
 {
 	bool success_flag = true;
 
-	FreeFieldTrialServiceData ((FieldTrialServiceData *) (service_p -> se_data_p));;
+	FreeSearchServiceData ((SearchServiceData *) (service_p -> se_data_p));
 
 	return success_flag;
 }
@@ -297,7 +300,7 @@ static bool CloseSearchService (Service *service_p)
 
 static ServiceJobSet *RunSearchService (Service *service_p, ParameterSet *param_set_p, UserDetails * UNUSED_PARAM (user_p), ProvidersStateTable * UNUSED_PARAM (providers_p))
 {
-	FieldTrialServiceData *data_p = (FieldTrialServiceData *) (service_p -> se_data_p);
+	SearchServiceData *data_p = (SearchServiceData *) (service_p -> se_data_p);
 
 	service_p -> se_jobs_p = AllocateSimpleServiceJobSet (service_p, NULL, "");
 
@@ -336,33 +339,8 @@ static ServiceJobSet *RunSearchService (Service *service_p, ParameterSet *param_
 							GetCurrentUnsignedIntParameterValueFromParameterSet (param_set_p, S_PAGE_SIZE.npt_name_s, &page_size_p);
 
 
-							SearchFieldTrialsForKeyword (keyword_s, facet_s, page_number_p ? *page_number_p : S_DEFAULT_PAGE_NUMBER, page_size_p ? *page_size_p : S_DEFAULT_PAGE_SIZE, job_p, VF_CLIENT_MINIMAL, data_p);
+							SearchKeyword (keyword_s, facet_s, page_number_p ? *page_number_p : S_DEFAULT_PAGE_NUMBER, page_size_p ? *page_size_p : S_DEFAULT_PAGE_SIZE, job_p, data_p);
 						}
-					else if (param_set_p -> ps_current_level == PL_ADVANCED)
-						{
-							/*
-							 * check for the advanced search
-							 */
-							if (!RunForSearchFieldTrialParams (data_p, param_set_p, job_p))
-								{
-									if (!RunForSearchStudyParams (data_p, param_set_p, job_p))
-										{
-											if (!RunForSearchLocationParams (data_p, param_set_p, job_p))
-												{
-													if (!RunForSearchMaterialParams (data_p, param_set_p, job_p))
-														{
-
-														}		/* if (!RunForSearchMaterialParams (data_p, param_set_p, job_p)) */
-
-												}		/* if (!RunForLocationParams (data_p, param_set_p, job_p)) */
-
-										}		/* if (!RunForStudyParams (data_p, param_set_p, job_p)) */
-
-								}		/* if (!RunForFieldTrialParams (data_p, param_set_p, job_p)) */
-
-						}		/* if (!ran_flag) */
-
-
 				}		/* if (param_set_p) */
 
 #if DFW_FIELD_TRIAL_SERVICE_DEBUG >= STM_LEVEL_FINE
@@ -558,10 +536,10 @@ static ParameterSet *IsResourceForSearchService (Service * UNUSED_PARAM (service
 }
 
 
-static void SearchFieldTrialsForKeyword (const char *keyword_s, const char *facet_s, const uint32 page_number, const uint32 page_size, ServiceJob *job_p, const ViewFormat fmt, FieldTrialServiceData *data_p)
+static void SearchKeyword (const char *keyword_s, const char *facet_s, const uint32 page_number, const uint32 page_size, ServiceJob *job_p,  SearchServiceData *data_p)
 {
 	OperationStatus status = OS_FAILED_TO_START;
-	GrassrootsServer *grassroots_p = GetGrassrootsServerFromService (data_p -> dftsd_base_data.sd_service_p);
+	GrassrootsServer *grassroots_p = GetGrassrootsServerFromService (data_p -> ssd_base_data.sd_service_p);
 	LuceneTool *lucene_p = AllocateLuceneTool (grassroots_p, job_p -> sj_id);
 
 	if (lucene_p)
@@ -609,7 +587,6 @@ static void SearchFieldTrialsForKeyword (const char *keyword_s, const char *face
 
 									sd.sd_service_data_p = data_p;
 									sd.sd_job_p = job_p;
-									sd.sd_format = fmt;
 
 									status = ParseLuceneResults (lucene_p, from, to, AddResultsFromLuceneResults, &sd);
 
@@ -697,87 +674,7 @@ static bool AddResultsFromLuceneResults (LuceneDocument *document_p, const uint3
 
 			if (type_s)
 				{
-					Data datatype = GetDatatypeFromString (type_s);
-
-					switch (datatype)
-						{
-							case DFTD_FIELD_TRIAL:
-//								success_flag = FindAndAddResultToServiceJob (id_s, search_data_p -> sd_format, search_data_p -> sd_job_p, NULL, GetFieldTrialJSONForId, search_data_p -> sd_service_data_p);
-								{
-									FieldTrial *trial_p = GetFieldTrialByIdString (id_s, search_data_p -> sd_format, search_data_p -> sd_service_data_p);
-
-									if (trial_p)
-										{
-											if (AddFieldTrialToServiceJob (search_data_p -> sd_job_p, trial_p, search_data_p -> sd_format, search_data_p -> sd_service_data_p))
-												{
-													success_flag = true;
-												}
-											else
-												{
-													PrintErrors (STM_LEVEL_SEVERE, __FILE__, __LINE__, "Failed to add field trial %s to ServiceJob", trial_p -> ft_name_s);
-												}
-
-											FreeFieldTrial (trial_p);
-										}
-								}
-								break;
-
-							case DFTD_STUDY:
-								success_flag = FindAndAddResultToServiceJob (id_s, search_data_p -> sd_format, search_data_p -> sd_job_p, NULL, GetStudyJSONForId, search_data_p -> sd_service_data_p);
-								break;
-
-							case DFTD_TREATMENT:
-								{
-									MeasuredVariable *treatment_p = GetMeasuredVariableByIdString (id_s, search_data_p -> sd_service_data_p);
-
-									if (treatment_p)
-										{
-											if (AddMeasuredVariableToServiceJob (search_data_p -> sd_job_p, treatment_p, search_data_p -> sd_format, search_data_p -> sd_service_data_p))
-												{
-													success_flag = true;
-												}
-											else
-												{
-													PrintErrors (STM_LEVEL_SEVERE, __FILE__, __LINE__, "Failed to add MeasuredVariable %s to ServiceJob", treatment_p -> mv_internal_name_s);
-												}
-
-											FreeMeasuredVariable (treatment_p);
-										}
-								}
-							break;
-
-							case DFTD_LOCATION:
-								{
-									Location *location_p = GetLocationByIdString (id_s, search_data_p -> sd_format, search_data_p -> sd_service_data_p);
-
-									if (location_p)
-										{
-											if (AddLocationToServiceJob (search_data_p -> sd_job_p, location_p, search_data_p -> sd_format, search_data_p -> sd_service_data_p))
-												{
-													success_flag = true;
-												}
-											else
-												{
-													const char *name_s = "";
-
-													if (location_p -> lo_address_p)
-														{
-															name_s = location_p -> lo_address_p -> ad_name_s;
-														}
-
-													PrintErrors (STM_LEVEL_SEVERE, __FILE__, __LINE__, "Failed to add Location %s to ServiceJob", name_s);
-												}
-
-											FreeLocation (location_p);
-										}
-								}
-							break;
-
-						default:
-							break;
-
-						}		/* switch (datatype) */
-
+					//success_flag = FindAndAddResultToServiceJob (id_s, search_data_p -> sd_format, search_data_p -> sd_job_p, NULL, GetFieldTrialJSONForId, search_data_p -> sd_service_data_p);
 				}		/* if (type_s) */
 
 		}		/* if (id_s) */
