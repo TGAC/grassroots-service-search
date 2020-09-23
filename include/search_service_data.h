@@ -14,35 +14,30 @@
 ** limitations under the License.
 */
 /*
- * search_service.h
+ * search_service_data.h
  *
- *  Created on: 24 Oct 2018
+ *  Created on: 24 Sep 2020
  *      Author: billy
  */
 
-#ifndef SERVICES_FIELD_TRIALS_INCLUDE_SEARCH_SERVICE_H_
-#define SERVICES_FIELD_TRIALS_INCLUDE_SEARCH_SERVICE_H_
+#ifndef SEARCH_SERVICE_DATA_H
+#define SEARCH_SERVICE_DATA_H
 
 
 
-#include "search_service_data.h"
+#include "service.h"
 #include "search_service_library.h"
 
 
-
-#ifdef __cplusplus
-extern "C"
+typedef struct SearchServiceData
 {
-#endif
+	ServiceData ssd_base_data;
+} SearchServiceData;
 
 
-SEARCH_SERVICE_LOCAL Service *GetSearchService (GrassrootsServer *grassroots_p);
+SearchServiceData *AllocateSearchServiceData (void);
+
+void FreeSearchServiceData (SearchServiceData *data_p);
 
 
-#ifdef __cplusplus
-}
-#endif
-
-
-
-#endif /* SERVICES_FIELD_TRIALS_INCLUDE_SEARCH_SERVICE_H_ */
+#endif /* SEARCH_SERVICE_DATA_H */
