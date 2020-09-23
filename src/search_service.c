@@ -16,7 +16,7 @@
 /*
  * search_service.c
  *
- *  Created on: 24 Oct 2018
+ *  Created on: 21 Sep 2020
  *      Author: billy
  */
 
@@ -42,6 +42,8 @@ static NamedParameterType S_KEYWORD = { "FT Keyword Search", PT_KEYWORD };
 static NamedParameterType S_FACET = { "FT Facet", PT_STRING };
 static NamedParameterType S_PAGE_NUMBER = { "FT Results Page Number", PT_UNSIGNED_INT };
 static NamedParameterType S_PAGE_SIZE = { "FT Results Page Size", PT_UNSIGNED_INT };
+
+static const char * const S_ANY_FACET_S = "<ANY>";
 
 
 static const uint32 S_DEFAULT_PAGE_NUMBER = 0;
@@ -180,19 +182,7 @@ static Parameter *AddFacetParameter (ParameterSet *params_p, ParameterGroup *gro
 		{
 			if (CreateAndAddStringParameterOption (param_p, S_ANY_FACET_S, "Any"))
 				{
-					if (CreateAndAddStringParameterOption (param_p, S_FIELD_TRIAL_FACET_S, S_FIELD_TRIAL_FACET_S))
-						{
-							if (CreateAndAddStringParameterOption (param_p, S_STUDY_FACET_S, S_STUDY_FACET_S))
-								{
-									if (CreateAndAddStringParameterOption (param_p, S_TREATMENT_FACET_S, S_TREATMENT_FACET_S))
-										{
-											if (CreateAndAddStringParameterOption (param_p, S_LOCATION_FACET_S, S_LOCATION_FACET_S))
-												{
-													return & (param_p -> sp_base_param);
-												}
-										}
-								}
-						}
+					return & (param_p -> sp_base_param);
 				}
 		}
 
