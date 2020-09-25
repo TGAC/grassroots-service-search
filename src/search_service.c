@@ -51,7 +51,7 @@ static const uint32 S_DEFAULT_PAGE_NUMBER = 0;
 static const uint32 S_DEFAULT_PAGE_SIZE = 10;
 
 
-static const char * const S_ANY_FACET_S = "<ANY>";
+static Service *GetSearchService (GrassrootsServer *grassroots_p);
 
 static const char *GetSearchServiceName (const Service *service_p);
 
@@ -98,7 +98,41 @@ typedef struct
  */
 
 
-Service *GetSearchService (GrassrootsServer *grassroots_p)
+ServicesArray *GetServices (UserDetails *user_p, GrassrootsServer *grassroots_p)
+{
+	Service *service_p = GetSearchService (grassroots_p);
+
+	if (service_p)
+		{
+			/*
+			 * Since we only have a single Service, create a ServicesArray with
+			 * 1 item.
+			 */
+			ServicesArray *services_p = AllocateServicesArray (1);
+
+			if (services_p)
+				{
+					* (services_p -> sa_services_pp) = service_p;
+
+
+					return services_p;
+				}
+
+			FreeService (service_p);
+		}
+
+	return NULL;
+}
+
+
+void ReleaseServices (ServicesArray *services_p)
+{
+	FreeServicesArray (services_p);
+}
+
+
+
+static Service *GetSearchService (GrassrootsServer *grassroots_p)
 {
 	Service *service_p = (Service *) AllocMemory (sizeof (Service));
 
@@ -127,12 +161,7 @@ Service *GetSearchService (GrassrootsServer *grassroots_p)
 														 NULL,
 														 grassroots_p))
 						{
-
-							if (ConfigureFieldTrialService (data_p, grassroots_p))
-								{
-									return service_p;
-								}
-
+							return service_p;
 						}		/* if (InitialiseService (.... */
 
 					FreeSearchServiceData (data_p);
@@ -674,7 +703,59 @@ static bool AddResultsFromLuceneResults (LuceneDocument *document_p, const uint3
 
 			if (type_s)
 				{
-					//success_flag = FindAndAddResultToServiceJob (id_s, search_data_p -> sd_format, search_data_p -> sd_job_p, NULL, GetFieldTrialJSONForId, search_data_p -> sd_service_data_p);
+					const char *name_s = GetDocumentFieldValue (document_p, "so:name");
+					json_t *result_p = GetCopyOfDocuemnt (document_p);
+
+					if (result_p)
+						{
+							if (strcmp (type_s, "Grassroots:Service") == 0)
+								{
+									const char * const PAYLOAD_KEY_S = "payload";
+									const char *payload_s = GetJSONString (result_p, PAYLOAD_KEY_S);
+
+									if (payload_s)
+										{
+											json_error_t err;
+											json_t *payload_p = json_loads (payload_s, 0, &err);
+
+											if (payload_p)
+												{
+													if (json_object_set_new (result_p, PAYLOAD_KEY_S, payload_p) != 0)
+														{
+															PrintJSONToErrors (STM_LEVEL_WARNING, __FILE__, __LINE__, result_p, "Failed to add unpacked payload");
+															json_decref (payload_p);
+														}
+												}
+											else
+												{
+													PrintJSONToErrors (STM_LEVEL_WARNING, __FILE__, __LINE__, result_p, "Failed to load payload \"%s\", %s", payload_s, err.text);
+												}
+										}
+									else
+										{
+											PrintJSONToErrors (STM_LEVEL_WARNING, __FILE__, __LINE__, result_p, "No payload");
+										}
+
+								}
+
+							json_t *dest_record_p = GetResourceAsJSONByParts (PROTOCOL_INLINE_S, NULL, name_s, result_p);
+
+							if (dest_record_p)
+								{
+									if (AddResultToServiceJob (search_data_p -> sd_job_p, dest_record_p))
+										{
+											success_flag = true;
+										}
+									else
+										{
+											json_decref (dest_record_p);
+										}
+
+								}		/* if (dest_record_p) */
+
+							json_decref (result_p);
+						}		/* if (result_p) */
+
 				}		/* if (type_s) */
 
 		}		/* if (id_s) */
