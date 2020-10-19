@@ -36,7 +36,10 @@ extern "C"
 #endif
 
 
-SEARCH_SERVICE_LOCAL Service *GetSearchService (GrassrootsServer *grassroots_p);
+SEARCH_SERVICE_API ServicesArray *GetServices (UserDetails *user_p, GrassrootsServer *grassroots_p);
+
+SEARCH_SERVICE_API void ReleaseServices (ServicesArray *services_p);
+
 
 
 #ifdef __cplusplus
