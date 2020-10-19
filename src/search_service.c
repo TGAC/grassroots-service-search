@@ -664,7 +664,7 @@ static bool AddResultsFromLuceneResults (LuceneDocument *document_p, const uint3
 {
 	bool success_flag = false;
 	SearchData *search_data_p = (SearchData *) data_p;
-	const char *id_s = GetDocumentFieldValue (document_p, MONGO_ID_S);
+	const char *id_s = GetDocumentFieldValue (document_p, LUCENE_ID_S);
 
 	if (id_s)
 		{
