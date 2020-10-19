@@ -761,7 +761,7 @@ static bool AddResultsFromLuceneResults (LuceneDocument *document_p, const uint3
 		}		/* if (id_s) */
 	else
 		{
-			PrintErrors (STM_LEVEL_SEVERE, __FILE__, __LINE__, "Failed to get \"_id\" from document");
+			PrintErrors (STM_LEVEL_SEVERE, __FILE__, __LINE__, "Failed to get \"%s\" from document", LUCENE_ID_S);
 		}
 
 	return success_flag;
