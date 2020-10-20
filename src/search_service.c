@@ -214,6 +214,43 @@ static Parameter *AddFacetParameter (ParameterSet *params_p, ParameterGroup *gro
 		{
 			if (CreateAndAddStringParameterOption (param_p, S_ANY_FACET_S, "Any"))
 				{
+					if (data_p -> ssd_base_data.sd_config_p)
+						{
+							json_t *facets_p = json_object_get (data_p -> ssd_base_data.sd_config_p, "facets");
+
+							if (facets_p)
+								{
+									if (json_is_array (facets_p))
+										{
+											size_t i;
+											json_t *facet_p;
+
+											json_array_foreach (facets_p, i, facet_p)
+												{
+													const char *name_s = GetJSONString (facet_p, "so:name");
+
+													if (name_s)
+														{
+															const char *description_s = GetJSONString (facet_p, "so:description");
+
+															if (name_s)
+																{
+																	if (!CreateAndAddStringParameterOption (param_p, name_s, description_s))
+																		{
+																			PrintErrors (STM_LEVEL_SEVERE, __FILE__, __LINE__, "Failed to add parameter option \"%s\": \"%s\"", name_s, description_s);
+																		}
+																}
+
+														}
+
+												}		/* json_array_foreach (facets_p, i, facet_p) */
+
+										}		/* if (json_is_array (facets_p)) */
+
+								}		/* if (facets_p) */
+
+						}		/* if (data_p -> ssd_base_data.sd_config_p) */
+
 					return & (param_p -> sp_base_param);
 				}
 		}
@@ -224,7 +261,7 @@ static Parameter *AddFacetParameter (ParameterSet *params_p, ParameterGroup *gro
 
 static ParameterSet *GetSearchServiceParameters (Service *service_p, Resource * UNUSED_PARAM (resource_p), UserDetails * UNUSED_PARAM (user_p))
 {
-	ParameterSet *params_p = AllocateParameterSet (" search service parameters", "The parameters used for the  search service");
+	ParameterSet *params_p = AllocateParameterSet ("search service parameters", "The parameters used for the  search service");
 
 	if (params_p)
 		{
@@ -232,17 +269,17 @@ static ParameterSet *GetSearchServiceParameters (Service *service_p, Resource * 
 			ParameterGroup *group_p = NULL;
 			Parameter *param_p = NULL;
 
-			if ((param_p = EasyCreateAndAddStringParameterToParameterSet (& (data_p -> ssd_base_data), params_p, group_p, S_KEYWORD.npt_type, S_KEYWORD.npt_name_s, "Search", "Search the field trial data", NULL, PL_SIMPLE)) != NULL)
+			if ((param_p = EasyCreateAndAddStringParameterToParameterSet (& (data_p -> ssd_base_data), params_p, group_p, S_KEYWORD.npt_type, S_KEYWORD.npt_name_s, "Search", "Search the field trial data", NULL, PL_ALL)) != NULL)
 				{
 					if (AddFacetParameter (params_p, group_p, data_p))
 						{
 							uint32 def = S_DEFAULT_PAGE_NUMBER;
 
-							if ((param_p = EasyCreateAndAddUnsignedIntParameterToParameterSet (& (data_p -> ssd_base_data), params_p, group_p, S_PAGE_NUMBER.npt_name_s, "Page", "The number of the results page to get", &def, PL_SIMPLE)) != NULL)
+							if ((param_p = EasyCreateAndAddUnsignedIntParameterToParameterSet (& (data_p -> ssd_base_data), params_p, group_p, S_PAGE_NUMBER.npt_name_s, "Page", "The number of the results page to get", &def, PL_ADVANCED)) != NULL)
 								{
 									def = S_DEFAULT_PAGE_SIZE;
 
-									if ((param_p = EasyCreateAndAddUnsignedIntParameterToParameterSet (& (data_p -> ssd_base_data), params_p, group_p, S_PAGE_SIZE.npt_name_s, "Page size", "The maximum number of results on each page", &def, PL_SIMPLE)) != NULL)
+									if ((param_p = EasyCreateAndAddUnsignedIntParameterToParameterSet (& (data_p -> ssd_base_data), params_p, group_p, S_PAGE_SIZE.npt_name_s, "Page size", "The maximum number of results on each page", &def, PL_ADVANCED)) != NULL)
 										{
 											return params_p;
 										}		/* if ((param_p = EasyCreateAndAddParameterToParameterSet (& (data_p -> ssd_base_data), params_p, group_p, S_PAGE_SIZE.npt_type, S_PAGE_SIZE.npt_name_s, "Page size", "The maximum number of results on each page", def, PL_SIMPLE)) != NULL) */
