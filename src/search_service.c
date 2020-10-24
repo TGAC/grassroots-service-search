@@ -380,33 +380,27 @@ static ServiceJobSet *RunSearchService (Service *service_p, ParameterSet *param_
 
 			if (param_set_p)
 				{
-					/*
-					 * check for simple search first
-					 */
-					if (param_set_p -> ps_current_level == PL_SIMPLE)
+					const char *keyword_s = NULL;
+					const char *facet_s = NULL;
+					const uint32 *page_number_p = NULL;
+					const uint32 *page_size_p = NULL;
+
+					GetCurrentStringParameterValueFromParameterSet (param_set_p, S_KEYWORD.npt_name_s, &keyword_s);
+					GetCurrentStringParameterValueFromParameterSet (param_set_p, S_FACET.npt_name_s, &facet_s);
+
+					if (facet_s)
 						{
-							const char *keyword_s = NULL;
-							const char *facet_s = NULL;
-							const uint32 *page_number_p = NULL;
-							const uint32 *page_size_p = NULL;
-
-							GetCurrentStringParameterValueFromParameterSet (param_set_p, S_KEYWORD.npt_name_s, &keyword_s);
-							GetCurrentStringParameterValueFromParameterSet (param_set_p, S_FACET.npt_name_s, &facet_s);
-
-							if (facet_s)
+							if (strcmp (facet_s, S_ANY_FACET_S) == 0)
 								{
-									if (strcmp (facet_s, S_ANY_FACET_S) == 0)
-										{
-											facet_s = NULL;
-										}
+									facet_s = NULL;
 								}
-
-							GetCurrentUnsignedIntParameterValueFromParameterSet (param_set_p, S_PAGE_NUMBER.npt_name_s, &page_number_p);
-							GetCurrentUnsignedIntParameterValueFromParameterSet (param_set_p, S_PAGE_SIZE.npt_name_s, &page_size_p);
-
-
-							SearchKeyword (keyword_s, facet_s, page_number_p ? *page_number_p : S_DEFAULT_PAGE_NUMBER, page_size_p ? *page_size_p : S_DEFAULT_PAGE_SIZE, job_p, data_p);
 						}
+
+					GetCurrentUnsignedIntParameterValueFromParameterSet (param_set_p, S_PAGE_NUMBER.npt_name_s, &page_number_p);
+					GetCurrentUnsignedIntParameterValueFromParameterSet (param_set_p, S_PAGE_SIZE.npt_name_s, &page_size_p);
+
+
+					SearchKeyword (keyword_s, facet_s, page_number_p ? *page_number_p : S_DEFAULT_PAGE_NUMBER, page_size_p ? *page_size_p : S_DEFAULT_PAGE_SIZE, job_p, data_p);
 				}		/* if (param_set_p) */
 
 #if DFW_FIELD_TRIAL_SERVICE_DEBUG >= STM_LEVEL_FINE
