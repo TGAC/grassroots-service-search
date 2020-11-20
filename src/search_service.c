@@ -199,7 +199,7 @@ static const char *GetSearchServiceInformationUri (const Service *service_p)
 
 	if (!url_s)
 		{
-			url_s = "https://grassroots.tools/docs/user/services/search/;
+			url_s = "https://grassroots.tools/docs/user/services/search/";
 		}
 
 	return url_s;
