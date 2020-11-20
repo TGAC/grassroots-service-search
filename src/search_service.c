@@ -189,7 +189,7 @@ static const char *GetSearchServiceDescription (const Service * UNUSED_PARAM (se
 
 static const char *GetSearchServiceAlias (const Service * UNUSED_PARAM (service_p))
 {
-	return "Grassroots" SERVICE_GROUP_ALIAS_SEPARATOR "search";
+	return "search";
 }
 
 
