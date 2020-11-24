@@ -80,7 +80,7 @@ static ServiceMetadata *GetSearchServiceMetadata (Service *service_p);
 static void SearchKeyword (const char *keyword_s, const char *facet_s, const uint32 page_number, const uint32 page_size, ServiceJob *job_p, SearchServiceData *data_p);
 
 
-static bool AddResultsFromLuceneResults (LuceneDocument *document_p, const uint32 index, void *data_p);
+static bool AddSearchResultsFromLuceneResults (json_t *document_p, const uint32 index, void *data_p);
 
 static Parameter *AddFacetParameter (ParameterSet *params_p, ParameterGroup *group_p, SearchServiceData *data_p);
 
@@ -648,7 +648,7 @@ static void SearchKeyword (const char *keyword_s, const char *facet_s, const uin
 									sd.sd_service_data_p = data_p;
 									sd.sd_job_p = job_p;
 
-									status = ParseLuceneResults (lucene_p, from, to, AddResultsFromLuceneResults, &sd);
+									status = ParseLuceneResults (lucene_p, from, to, AddSearchResultsFromLuceneResults, &sd);
 
 									if ((status == OS_SUCCEEDED) || (status == OS_PARTIALLY_SUCCEEDED))
 										{
@@ -722,23 +722,25 @@ static void SearchKeyword (const char *keyword_s, const char *facet_s, const uin
 }
 
 
-static bool AddResultsFromLuceneResults (LuceneDocument *document_p, const uint32 index, void *data_p)
+static bool AddSearchResultsFromLuceneResults (json_t *document_p, const uint32 index, void *data_p)
 {
 	bool success_flag = false;
 	SearchData *search_data_p = (SearchData *) data_p;
-	const char *id_s = GetDocumentFieldValue (document_p, LUCENE_ID_S);
+	const char *id_s = GetJSONString (document_p, LUCENE_ID_S);
 
 	if (id_s)
 		{
-			const char *type_s = GetDocumentFieldValue (document_p, "@type");
+			const char *type_s = GetJSONString (document_p, "@type");
 
 			if (type_s)
 				{
-					const char *name_s = GetDocumentFieldValue (document_p, "so:name");
-					json_t *result_p = GetCopyOfDocuemnt (document_p);
+					const char *name_s = GetJSONString (document_p, "so:name");
+					json_t *result_p = json_deep_copy (document_p);
 
 					if (result_p)
 						{
+							json_t *dest_record_p = NULL;
+
 							if (strcmp (type_s, "Grassroots:Service") == 0)
 								{
 									const char * const PAYLOAD_KEY_S = "payload";
@@ -767,9 +769,10 @@ static bool AddResultsFromLuceneResults (LuceneDocument *document_p, const uint3
 											PrintJSONToErrors (STM_LEVEL_WARNING, __FILE__, __LINE__, result_p, "No payload");
 										}
 
-								}
+								}		/* if (strcmp (type_s, "Grassroots:Service") == 0) */
 
-							json_t *dest_record_p = GetResourceAsJSONByParts (PROTOCOL_INLINE_S, NULL, name_s, result_p);
+
+							dest_record_p = GetResourceAsJSONByParts (PROTOCOL_INLINE_S, NULL, name_s, result_p);
 
 							if (dest_record_p)
 								{
