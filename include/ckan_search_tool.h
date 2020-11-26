@@ -1,0 +1,15 @@
+/*
+ * ckan_search_tool.h
+ *
+ *  Created on: 26 Nov 2020
+ *      Author: billy
+ */
+
+#ifndef SERVICES_SEARCH_SERVICE_INCLUDE_CKAN_SEARCH_TOOL_H_
+#define SERVICES_SEARCH_SERVICE_INCLUDE_CKAN_SEARCH_TOOL_H_
+
+
+
+
+
+#endif /* SERVICES_SEARCH_SERVICE_INCLUDE_CKAN_SEARCH_TOOL_H_ */
