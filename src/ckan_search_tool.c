@@ -16,9 +16,11 @@
 #include "lucene_tool.h"
 
 
-static json_t *GetResult (const json_t *ckan_result_p, const char *ckan_url_s);
+static json_t *GetResult (const json_t *ckan_result_p, const char *ckan_url_s, json_t *facet_counts_p);
 
 static json_t *ParseCKANResults (const json_t *ckan_results_p, const char *ckan_url_s);
+
+static bool ParseResultGroups (const json_t *groups_p, json_t *facet_counts_p);
 
 
 /*
@@ -47,32 +49,32 @@ json_t *SearchCKAN (const char *ckan_url_s, const char *query_s, const json_t *f
 									json_t *filter_p;
 
 									json_array_foreach (filters_p, i, filter_p)
-										{
-											const char *key_s = GetJSONString (filter_p, "key");
+									{
+										const char *key_s = GetJSONString (filter_p, "key");
 
-											if (key_s)
-												{
-													const char *value_s = GetJSONString (filter_p, "value");
+										if (key_s)
+											{
+												const char *value_s = GetJSONString (filter_p, "value");
 
-													if (value_s)
-														{
-															if (!AppendStringsToByteBuffer (buffer_p, "&fq=", key_s, ":", value_s, NULL))
-																{
-																	success_flag = false;
-																}
-														}
-													else
-														{
-															success_flag = false;
-														}
+												if (value_s)
+													{
+														if (!AppendStringsToByteBuffer (buffer_p, "&fq=", key_s, ":", value_s, NULL))
+															{
+																success_flag = false;
+															}
+													}
+												else
+													{
+														success_flag = false;
+													}
 
-												}
-											else
-												{
-													success_flag = false;
-												}
+											}
+										else
+											{
+												success_flag = false;
+											}
 
-										}
+									}
 
 								}		/* if (filters_p) */
 
@@ -122,7 +124,6 @@ json_t *SearchCKAN (const char *ckan_url_s, const char *query_s, const json_t *f
 
 static json_t *ParseCKANResults (const json_t *ckan_results_p, const char *ckan_url_s)
 {
-	json_t *grassroots_results_p = NULL;
 	const json_t *ckan_result_p = json_object_get (ckan_results_p, "result");
 
 	if (ckan_result_p)
@@ -136,45 +137,77 @@ static json_t *ParseCKANResults (const json_t *ckan_results_p, const char *ckan_
 				{
 					if (json_is_array (results_p))
 						{
-							grassroots_results_p = json_array ();
+							json_t *res_p = json_object ();
 
-							if (grassroots_results_p)
+							if (res_p)
 								{
-									size_t i;
+									json_t *grassroots_results_p = json_array ();
 
-									json_array_foreach (results_p, i, ckan_result_p)
+									if (grassroots_results_p)
 										{
-											json_t *grassroots_result_p = GetResult (ckan_result_p, ckan_url_s);
-
-											if (grassroots_result_p)
+											if (json_object_set_new (res_p, "results", grassroots_results_p) == 0)
 												{
-													if (json_array_append_new (grassroots_results_p, grassroots_result_p) != 0)
+													json_t *facet_counts_p = json_object ();
+
+													if (facet_counts_p)
 														{
-															PrintJSONToErrors (STM_LEVEL_SEVERE, __FILE__, __LINE__, grassroots_result_p, "Failed to add grassroots result");
-															json_decref (grassroots_result_p);
-														}
+															if (json_object_set_new (res_p, "facets", facet_counts_p) == 0)
+																{
+																	size_t i;
+
+																	json_array_foreach (results_p, i, ckan_result_p)
+																	{
+																		json_t *grassroots_result_p = GetResult (ckan_result_p, ckan_url_s, facet_counts_p);
+
+																		if (grassroots_result_p)
+																			{
+																				if (json_array_append_new (grassroots_results_p, grassroots_result_p) != 0)
+																					{
+																						PrintJSONToErrors (STM_LEVEL_SEVERE, __FILE__, __LINE__, grassroots_result_p, "Failed to add grassroots result");
+																						json_decref (grassroots_result_p);
+																					}
+																			}
+																		else
+																			{
+																				PrintJSONToErrors (STM_LEVEL_SEVERE, __FILE__, __LINE__, ckan_result_p, "Failed to create grassroots result");
+																			}
+																	}
+
+																	return res_p;
+
+																}		/* if (json_object_set_new (res_p, "facets", facet_counts_p) == 0) */
+															else
+																{
+																	json_decref (facet_counts_p);
+																}
+
+														}		/* if (facet_counts_p) */
 												}
 											else
 												{
-													PrintJSONToErrors (STM_LEVEL_SEVERE, __FILE__, __LINE__, ckan_result_p, "Failed to create grassroots result");
+													json_decref (grassroots_results_p);
 												}
 										}
-								}
-							else
-								{
-									PrintErrors (STM_LEVEL_SEVERE, __FILE__, __LINE__, "Failed to create grassroots results array");
-								}
+									else
+										{
+											PrintErrors (STM_LEVEL_SEVERE, __FILE__, __LINE__, "Failed to create grassroots results array");
+										}
+
+								}		/* if (res_p) */
+
+
 						}
 				}
+
 		}
 
-	return grassroots_results_p;
+	return NULL;
 }
 
 
 
 
-static json_t *GetResult (const json_t *ckan_result_p, const char *ckan_url_s)
+static json_t *GetResult (const json_t *ckan_result_p, const char *ckan_url_s, json_t *facet_counts_p)
 {
 	json_t *grassroots_result_p = NULL;
 	const char *id_s = GetJSONString (ckan_result_p, "id");
@@ -195,21 +228,27 @@ static json_t *GetResult (const json_t *ckan_result_p, const char *ckan_url_s)
 								{
 									bool success_flag = false;
 
-									if (SetJSONString (grassroots_result_p, "@type", "Grassroots:Publication"))
+									if (SetJSONString (grassroots_result_p, INDEXING_TYPE_S, "Grassroots:Publication"))
 										{
-											if (SetJSONString (grassroots_result_p, "@type", "Grassroots:Publication"))
+											if (SetJSONString (grassroots_result_p, INDEXING_TYPE_DESCRIPTION_S, "Grassroots:Publication"))
 												{
 													if (SetJSONString (grassroots_result_p, LUCENE_ID_S, url_s))
 														{
-															if (SetJSONString (grassroots_result_p, "so:url", url_s))
+															if (SetJSONString (grassroots_result_p, WEB_SERVICE_URL_S, url_s))
 																{
-																	if (SetJSONString (grassroots_result_p, "so:name", title_s))
+																	if (SetJSONString (grassroots_result_p, INDEXING_NAME_S, title_s))
 																		{
+																			json_t *groups_p = json_object_get (ckan_result_p, "groups");
 																			const char *notes_s = GetJSONString (ckan_result_p, "notes");
 
 																			if (notes_s)
 																				{
-																					SetJSONString (grassroots_result_p, "so:description", notes_s);
+																					SetJSONString (grassroots_result_p, INDEXING_DESCRIPTION_S, notes_s);
+																				}
+
+																			if (groups_p)
+																				{
+																					ParseResultGroups (groups_p, facet_counts_p);
 																				}
 
 																			success_flag = true;
@@ -233,4 +272,38 @@ static json_t *GetResult (const json_t *ckan_result_p, const char *ckan_url_s)
 		}
 
 	return grassroots_result_p;
+}
+
+
+static bool ParseResultGroups (const json_t *groups_p, json_t *facet_counts_p)
+{
+	size_t i;
+	const json_t *group_p;
+	bool success_flag = true;
+
+	json_array_foreach (groups_p, i, group_p)
+		{
+			const char *facet_s = GetJSONString (group_p, "title");
+
+			if (facet_s)
+				{
+					int count;
+
+					if (GetJSONInteger (facet_counts_p, facet_s, &count))
+						{
+							++ count;
+						}
+					else
+						{
+							count = 1;
+						}
+
+					if (!SetJSONInteger (facet_counts_p, facet_s, count))
+						{
+							success_flag = false;
+						}
+				}
+		}
+
+	return success_flag;
 }
