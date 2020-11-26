@@ -32,12 +32,28 @@
 typedef struct SearchServiceData
 {
 	ServiceData ssd_base_data;
+	const char *ssd_ckan_url_s;
+	json_t *ssd_ckan_filters_p;
 } SearchServiceData;
 
 
-SearchServiceData *AllocateSearchServiceData (void);
+#ifdef __cplusplus
+extern "C"
+{
+#endif
 
-void FreeSearchServiceData (SearchServiceData *data_p);
+
+
+SEARCH_SERVICE_LOCAL SearchServiceData *AllocateSearchServiceData (void);
+
+SEARCH_SERVICE_LOCAL void FreeSearchServiceData (SearchServiceData *data_p);
+
+SEARCH_SERVICE_LOCAL bool ConfigureSearchServiceData (SearchServiceData *data_p);
+
+
+#ifdef __cplusplus
+}
+#endif
 
 
 #endif /* SEARCH_SERVICE_DATA_H */

@@ -22,6 +22,8 @@
 
 #include "search_service.h"
 
+#include "ckan_search_tool.h"
+
 #include "unsigned_int_parameter.h"
 #include "string_parameter.h"
 
@@ -161,7 +163,10 @@ static Service *GetSearchService (GrassrootsServer *grassroots_p)
 														 NULL,
 														 grassroots_p))
 						{
-							return service_p;
+							if (ConfigureSearchServiceData (data_p))
+								{
+									return service_p;
+								}
 						}		/* if (InitialiseService (.... */
 
 					FreeSearchServiceData (data_p);
@@ -644,11 +649,59 @@ static void SearchKeyword (const char *keyword_s, const char *facet_s, const uin
 									SearchData sd;
 									const uint32 from = page_number * page_size;
 									const uint32 to = from + page_size - 1;
+									json_t *ckan_results_p = NULL;
 
 									sd.sd_service_data_p = data_p;
 									sd.sd_job_p = job_p;
 
 									status = ParseLuceneResults (lucene_p, from, to, AddSearchResultsFromLuceneResults, &sd);
+
+									if (data_p -> ssd_ckan_url_s)
+										{
+											ckan_results_p = SearchCKAN (data_p -> ssd_ckan_url_s, keyword_s, data_p -> ssd_ckan_filters_p);
+
+											if (ckan_results_p)
+												{
+													if (json_is_array (ckan_results_p))
+														{
+															const size_t num_results = json_array_size (ckan_results_p);
+															size_t i = 0;
+															size_t num_successes = 0;
+
+															while (i < num_results)
+																{
+																	json_t *ckan_result_p = json_array_get (ckan_results_p, i);
+																	const char *name_s = GetJSONString (ckan_result_p, "so:name");
+																	json_t *dest_record_p = GetResourceAsJSONByParts (PROTOCOL_INLINE_S, NULL, name_s, ckan_result_p);
+
+																	if (dest_record_p)
+																		{
+																			if (AddResultToServiceJob (job_p, dest_record_p))
+																				{
+																					success_flag = true;
+																				}
+																			else
+																				{
+																					json_decref (dest_record_p);
+																				}
+
+																		}		/* if (dest_record_p) */
+
+																	++ i;
+																}		/* while (loop_flag && success_flag) */
+
+
+															if ((num_successes > 0) && (num_successes < num_results))
+																{
+																	status = OS_PARTIALLY_SUCCEEDED;
+																}
+
+														}		/* if (json_is_array (docs_p)) */
+
+													json_decref (ckan_results_p);
+												}
+										}
+
 
 									if ((status == OS_SUCCEEDED) || (status == OS_PARTIALLY_SUCCEEDED))
 										{
@@ -720,6 +773,7 @@ static void SearchKeyword (const char *keyword_s, const char *facet_s, const uin
 
 	SetServiceJobStatus (job_p, status);
 }
+
 
 
 static bool AddSearchResultsFromLuceneResults (json_t *document_p, const uint32 index, void *data_p)

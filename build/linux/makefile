@@ -44,6 +44,7 @@ INCLUDES = \
 
 	
 SRCS 	= \
+	ckan_search_tool.c \
 	search_service.c \
 	search_service_data.c \
 
