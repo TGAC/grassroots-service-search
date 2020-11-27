@@ -230,7 +230,7 @@ static json_t *GetResult (const json_t *ckan_result_p, const char *ckan_url_s, j
 
 									if (SetJSONString (grassroots_result_p, INDEXING_TYPE_S, "Grassroots:Publication"))
 										{
-											if (SetJSONString (grassroots_result_p, INDEXING_TYPE_DESCRIPTION_S, "Grassroots:Publication"))
+											if (SetJSONString (grassroots_result_p, INDEXING_TYPE_DESCRIPTION_S, "Publication"))
 												{
 													if (SetJSONString (grassroots_result_p, LUCENE_ID_S, url_s))
 														{
