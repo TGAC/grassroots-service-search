@@ -42,6 +42,7 @@ bool ConfigureSearchServiceData (SearchServiceData *data_p)
 						{
 							data_p -> ssd_ckan_type_s = GetJSONString (mapping_p, INDEXING_TYPE_S);
 							data_p -> ssd_ckan_type_description_s = GetJSONString (mapping_p, INDEXING_TYPE_DESCRIPTION_S);
+							data_p -> ssd_ckan_result_icon_s = GetJSONString (mapping_p, INDEXING_ICON_URI_S);
 						}
 
 					success_flag = true;

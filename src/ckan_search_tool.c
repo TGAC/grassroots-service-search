@@ -16,9 +16,9 @@
 #include "lucene_tool.h"
 
 
-static json_t *GetResult (const json_t *ckan_result_p, const char *ckan_url_s, const char *datatype_s, const char *datatype_description_s, json_t *facet_counts_p);
+static json_t *GetResult (const json_t *ckan_result_p, const char *ckan_url_s, const char *datatype_s, const char *datatype_description_s, const char *image_s, json_t *facet_counts_p);
 
-static json_t *ParseCKANResults (const json_t *ckan_results_p, const char *ckan_url_s, const char *type_s, const char *type_descripition_s);
+static json_t *ParseCKANResults (const json_t *ckan_results_p, const char *ckan_url_s, const char *type_s, const char *type_description_s, const char *image_s);
 
 static bool ParseResultGroups (const json_t *groups_p, json_t *facet_counts_p);
 
@@ -97,7 +97,7 @@ json_t *SearchCKAN (const char *query_s, const SearchServiceData *data_p)
 
 															if (ckan_results_p)
 																{
-																	grassroots_results_p = ParseCKANResults (ckan_results_p, data_p -> ssd_ckan_url_s, data_p -> ssd_ckan_type_s, data_p -> ssd_ckan_type_description_s);
+																	grassroots_results_p = ParseCKANResults (ckan_results_p, data_p -> ssd_ckan_url_s, data_p -> ssd_ckan_type_s, data_p -> ssd_ckan_type_description_s, data_p -> ssd_ckan_result_icon_s);
 																	json_decref (ckan_results_p);
 																}
 
@@ -122,7 +122,7 @@ json_t *SearchCKAN (const char *query_s, const SearchServiceData *data_p)
 }
 
 
-static json_t *ParseCKANResults (const json_t *ckan_results_p, const char *ckan_url_s, const char *type_s, const char *type_description_s)
+static json_t *ParseCKANResults (const json_t *ckan_results_p, const char *ckan_url_s, const char *type_s, const char *type_description_s, const char *image_s)
 {
 	const json_t *ckan_result_p = json_object_get (ckan_results_p, "result");
 
@@ -157,7 +157,7 @@ static json_t *ParseCKANResults (const json_t *ckan_results_p, const char *ckan_
 
 																	json_array_foreach (results_p, i, ckan_result_p)
 																		{
-																			json_t *grassroots_result_p = GetResult (ckan_result_p, ckan_url_s, type_s, type_description_s, facet_counts_p);
+																			json_t *grassroots_result_p = GetResult (ckan_result_p, ckan_url_s, type_s, type_description_s, image_s, facet_counts_p);
 
 																			if (grassroots_result_p)
 																				{
@@ -207,7 +207,7 @@ static json_t *ParseCKANResults (const json_t *ckan_results_p, const char *ckan_
 
 
 
-static json_t *GetResult (const json_t *ckan_result_p, const char *ckan_url_s, const char *datatype_s, const char *datatype_description_s, json_t *facet_counts_p)
+static json_t *GetResult (const json_t *ckan_result_p, const char *ckan_url_s, const char *datatype_s, const char *datatype_description_s, const char *image_s, json_t *facet_counts_p)
 {
 	json_t *grassroots_result_p = NULL;
 	const char *id_s = GetJSONString (ckan_result_p, "id");
@@ -250,6 +250,11 @@ static json_t *GetResult (const json_t *ckan_result_p, const char *ckan_url_s, c
 																			if (value_s)
 																				{
 																					SetJSONString (grassroots_result_p, "author", value_s);
+																				}
+
+																			if (image_s)
+																				{
+																					SetJSONString (grassroots_result_p, INDEXING_ICON_URI_S, image_s);
 																				}
 
 																			if (groups_p)

@@ -36,6 +36,7 @@ typedef struct SearchServiceData
 	const json_t *ssd_ckan_filters_p;
 	const char *ssd_ckan_type_s;
 	const char *ssd_ckan_type_description_s;
+	const char *ssd_ckan_result_icon_s;
 } SearchServiceData;
 
 
