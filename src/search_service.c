@@ -662,14 +662,14 @@ static void SearchKeyword (const char *keyword_s, const char *facet_s, const uin
 											if (ckan_p)
 												{
 													const json_t *facet_counts_p = json_object_get (ckan_p, "facets");
-													const json_t *ckan_results_p = json_object_get (ckan_results_p, "results");
+													const json_t *ckan_results_p = json_object_get (ckan_p, "results");
 
-													if (facets_p)
+													if (facet_counts_p)
 														{
 															const char *key_s;
 															json_t *value_p;
 
-															json_object_foreach (facets_p, key_s, value_p)
+															json_object_foreach (facet_counts_p, key_s, value_p)
 																{
 
 																	if (json_is_integer (value_p))
@@ -718,6 +718,9 @@ static void SearchKeyword (const char *keyword_s, const char *facet_s, const uin
 																		{
 																			status = OS_PARTIALLY_SUCCEEDED;
 																		}
+
+																	lucene_p -> lt_num_total_hits += num_results;
+																	lucene_p -> lt_hits_to_index += num_results;
 
 																}		/* if (json_is_array (docs_p)) */
 
