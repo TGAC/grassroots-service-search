@@ -16,9 +16,9 @@
 #include "lucene_tool.h"
 
 
-static json_t *GetResult (const json_t *ckan_result_p, const char *ckan_url_s, json_t *facet_counts_p);
+static json_t *GetResult (const json_t *ckan_result_p, const char *ckan_url_s, const char *datatype_s, const char *datatype_description_s, json_t *facet_counts_p);
 
-static json_t *ParseCKANResults (const json_t *ckan_results_p, const char *ckan_url_s);
+static json_t *ParseCKANResults (const json_t *ckan_results_p, const char *ckan_url_s, const char *type_s, const char *type_descripition_s);
 
 static bool ParseResultGroups (const json_t *groups_p, json_t *facet_counts_p);
 
@@ -28,7 +28,7 @@ static bool ParseResultGroups (const json_t *groups_p, json_t *facet_counts_p);
  */
 
 
-json_t *SearchCKAN (const char *ckan_url_s, const char *query_s, const json_t *filters_p)
+json_t *SearchCKAN (const char *query_s, const SearchServiceData *data_p)
 {
 	json_t *grassroots_results_p = NULL;
 	CurlTool *curl_p = AllocateCurlTool (CM_MEMORY);
@@ -39,42 +39,42 @@ json_t *SearchCKAN (const char *ckan_url_s, const char *query_s, const json_t *f
 
 			if (buffer_p)
 				{
-					if (AppendStringsToByteBuffer (buffer_p, ckan_url_s, "/api/3/action/package_search?q=", query_s, NULL))
+					if (AppendStringsToByteBuffer (buffer_p, data_p -> ssd_ckan_url_s, "/api/3/action/package_search?q=", query_s, NULL))
 						{
 							bool success_flag = true;
 
-							if (filters_p)
+							if (data_p -> ssd_ckan_filters_p)
 								{
 									size_t i;
 									json_t *filter_p;
 
-									json_array_foreach (filters_p, i, filter_p)
-									{
-										const char *key_s = GetJSONString (filter_p, "key");
+									json_array_foreach (data_p -> ssd_ckan_filters_p, i, filter_p)
+										{
+											const char *key_s = GetJSONString (filter_p, "key");
 
-										if (key_s)
-											{
-												const char *value_s = GetJSONString (filter_p, "value");
+											if (key_s)
+												{
+													const char *value_s = GetJSONString (filter_p, "value");
 
-												if (value_s)
-													{
-														if (!AppendStringsToByteBuffer (buffer_p, "&fq=", key_s, ":", value_s, NULL))
-															{
-																success_flag = false;
-															}
-													}
-												else
-													{
-														success_flag = false;
-													}
+													if (value_s)
+														{
+															if (!AppendStringsToByteBuffer (buffer_p, "&fq=", key_s, ":", value_s, NULL))
+																{
+																	success_flag = false;
+																}
+														}
+													else
+														{
+															success_flag = false;
+														}
 
-											}
-										else
-											{
-												success_flag = false;
-											}
+												}
+											else
+												{
+													success_flag = false;
+												}
 
-									}
+										}
 
 								}		/* if (filters_p) */
 
@@ -97,7 +97,7 @@ json_t *SearchCKAN (const char *ckan_url_s, const char *query_s, const json_t *f
 
 															if (ckan_results_p)
 																{
-																	grassroots_results_p = ParseCKANResults (ckan_results_p, ckan_url_s);
+																	grassroots_results_p = ParseCKANResults (ckan_results_p, data_p -> ssd_ckan_url_s, data_p -> ssd_ckan_type_s, data_p -> ssd_ckan_type_description_s);
 																	json_decref (ckan_results_p);
 																}
 
@@ -122,7 +122,7 @@ json_t *SearchCKAN (const char *ckan_url_s, const char *query_s, const json_t *f
 }
 
 
-static json_t *ParseCKANResults (const json_t *ckan_results_p, const char *ckan_url_s)
+static json_t *ParseCKANResults (const json_t *ckan_results_p, const char *ckan_url_s, const char *type_s, const char *type_description_s)
 {
 	const json_t *ckan_result_p = json_object_get (ckan_results_p, "result");
 
@@ -156,22 +156,22 @@ static json_t *ParseCKANResults (const json_t *ckan_results_p, const char *ckan_
 																	size_t i;
 
 																	json_array_foreach (results_p, i, ckan_result_p)
-																	{
-																		json_t *grassroots_result_p = GetResult (ckan_result_p, ckan_url_s, facet_counts_p);
+																		{
+																			json_t *grassroots_result_p = GetResult (ckan_result_p, ckan_url_s, type_s, type_description_s, facet_counts_p);
 
-																		if (grassroots_result_p)
-																			{
-																				if (json_array_append_new (grassroots_results_p, grassroots_result_p) != 0)
-																					{
-																						PrintJSONToErrors (STM_LEVEL_SEVERE, __FILE__, __LINE__, grassroots_result_p, "Failed to add grassroots result");
-																						json_decref (grassroots_result_p);
-																					}
-																			}
-																		else
-																			{
-																				PrintJSONToErrors (STM_LEVEL_SEVERE, __FILE__, __LINE__, ckan_result_p, "Failed to create grassroots result");
-																			}
-																	}
+																			if (grassroots_result_p)
+																				{
+																					if (json_array_append_new (grassroots_results_p, grassroots_result_p) != 0)
+																						{
+																							PrintJSONToErrors (STM_LEVEL_SEVERE, __FILE__, __LINE__, grassroots_result_p, "Failed to add grassroots result");
+																							json_decref (grassroots_result_p);
+																						}
+																				}
+																			else
+																				{
+																					PrintJSONToErrors (STM_LEVEL_SEVERE, __FILE__, __LINE__, ckan_result_p, "Failed to create grassroots result");
+																				}
+																		}
 
 																	return res_p;
 
@@ -207,14 +207,14 @@ static json_t *ParseCKANResults (const json_t *ckan_results_p, const char *ckan_
 
 
 
-static json_t *GetResult (const json_t *ckan_result_p, const char *ckan_url_s, json_t *facet_counts_p)
+static json_t *GetResult (const json_t *ckan_result_p, const char *ckan_url_s, const char *datatype_s, const char *datatype_description_s, json_t *facet_counts_p)
 {
 	json_t *grassroots_result_p = NULL;
 	const char *id_s = GetJSONString (ckan_result_p, "id");
 
 	if (id_s)
 		{
-			char *url_s = ConcatenateStrings (ckan_url_s, id_s);
+			char *url_s = ConcatenateVarargsStrings (ckan_url_s, "/dataset/", id_s, NULL);
 
 			if (url_s)
 				{
@@ -228,9 +228,9 @@ static json_t *GetResult (const json_t *ckan_result_p, const char *ckan_url_s, j
 								{
 									bool success_flag = false;
 
-									if (SetJSONString (grassroots_result_p, INDEXING_TYPE_S, "Grassroots:Publication"))
+									if (SetJSONString (grassroots_result_p, INDEXING_TYPE_S, datatype_s))
 										{
-											if (SetJSONString (grassroots_result_p, INDEXING_TYPE_DESCRIPTION_S, "Publication"))
+											if (SetJSONString (grassroots_result_p, INDEXING_TYPE_DESCRIPTION_S, datatype_description_s))
 												{
 													if (SetJSONString (grassroots_result_p, LUCENE_ID_S, url_s))
 														{

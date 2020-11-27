@@ -657,7 +657,7 @@ static void SearchKeyword (const char *keyword_s, const char *facet_s, const uin
 
 									if (data_p -> ssd_ckan_url_s)
 										{
-											json_t *ckan_p = SearchCKAN (data_p -> ssd_ckan_url_s, keyword_s, data_p -> ssd_ckan_filters_p);
+											json_t *ckan_p = SearchCKAN (keyword_s, data_p);
 
 											if (ckan_p)
 												{

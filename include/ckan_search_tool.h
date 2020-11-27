@@ -22,7 +22,7 @@ extern "C"
 #endif
 
 
-SEARCH_SERVICE_LOCAL json_t *SearchCKAN (const char *ckan_url_s, const char *query_s, const json_t *filters_p);
+SEARCH_SERVICE_LOCAL json_t *SearchCKAN (const char *query_s, const SearchServiceData *data_p);
 
 
 #ifdef __cplusplus
