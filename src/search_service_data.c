@@ -35,7 +35,14 @@ bool ConfigureSearchServiceData (SearchServiceData *data_p)
 
 			if (data_p -> ssd_ckan_url_s)
 				{
+					const json_t *mapping_p = json_object_get (search_service_config_p, "ckan_datatype");
 					data_p -> ssd_ckan_filters_p = json_object_get (search_service_config_p, "ckan_filters");
+
+					if (mapping_p)
+						{
+							data_p -> ssd_ckan_type_s = GetJSONString (mapping_p, INDEXING_TYPE_S);
+							data_p -> ssd_ckan_type_description_s = GetJSONString (mapping_p, INDEXING_TYPE_DESCRIPTION_S);
+						}
 
 					success_flag = true;
 				}

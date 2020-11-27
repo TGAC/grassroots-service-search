@@ -664,6 +664,7 @@ static void SearchKeyword (const char *keyword_s, const char *facet_s, const uin
 													const json_t *facet_counts_p = json_object_get (ckan_p, "facets");
 													const json_t *ckan_results_p = json_object_get (ckan_p, "results");
 
+													/*
 													if (facet_counts_p)
 														{
 															const char *key_s;
@@ -671,7 +672,6 @@ static void SearchKeyword (const char *keyword_s, const char *facet_s, const uin
 
 															json_object_foreach (facet_counts_p, key_s, value_p)
 																{
-
 																	if (json_is_integer (value_p))
 																		{
 																			int count = json_integer_value (value_p);
@@ -679,9 +679,8 @@ static void SearchKeyword (const char *keyword_s, const char *facet_s, const uin
 																			AddFacetResultToLucene (lucene_p, key_s, count);
 																		}
 																}
-
 														}
-
+													*/
 
 													if (ckan_results_p)
 														{
@@ -690,6 +689,11 @@ static void SearchKeyword (const char *keyword_s, const char *facet_s, const uin
 																	const size_t num_results = json_array_size (ckan_results_p);
 																	size_t i = 0;
 																	size_t num_successes = 0;
+
+																	if (data_p -> ssd_ckan_type_description_s)
+																		{
+																			AddFacetResultToLucene (lucene_p, data_p -> ssd_ckan_type_description_s, num_results);
+																		}
 
 																	while (i < num_results)
 																		{

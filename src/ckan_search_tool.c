@@ -239,11 +239,17 @@ static json_t *GetResult (const json_t *ckan_result_p, const char *ckan_url_s, j
 																	if (SetJSONString (grassroots_result_p, INDEXING_NAME_S, title_s))
 																		{
 																			json_t *groups_p = json_object_get (ckan_result_p, "groups");
-																			const char *notes_s = GetJSONString (ckan_result_p, "notes");
+																			const char *value_s = GetJSONString (ckan_result_p, "notes");
 
-																			if (notes_s)
+																			if (value_s)
 																				{
-																					SetJSONString (grassroots_result_p, INDEXING_DESCRIPTION_S, notes_s);
+																					SetJSONString (grassroots_result_p, INDEXING_DESCRIPTION_S, value_s);
+																				}
+
+																			value_s = GetJSONString (ckan_result_p, "author");
+																			if (value_s)
+																				{
+																					SetJSONString (grassroots_result_p, "author", value_s);
 																				}
 
 																			if (groups_p)
