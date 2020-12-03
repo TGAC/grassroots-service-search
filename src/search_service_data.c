@@ -31,6 +31,8 @@ bool ConfigureSearchServiceData (SearchServiceData *data_p)
 
 	if (search_service_config_p)
 		{
+			success_flag = true;
+
 			data_p -> ssd_ckan_url_s = GetJSONString (search_service_config_p, "ckan_url");
 
 			if (data_p -> ssd_ckan_url_s)
@@ -45,7 +47,6 @@ bool ConfigureSearchServiceData (SearchServiceData *data_p)
 							data_p -> ssd_ckan_result_icon_s = GetJSONString (mapping_p, INDEXING_ICON_URI_S);
 						}
 
-					success_flag = true;
 				}
 
 		}		/* if (search_service_config_p) */
