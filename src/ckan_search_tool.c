@@ -129,7 +129,7 @@ static json_t *ParseCKANResults (const json_t *ckan_results_p, const char *ckan_
 	if (ckan_result_p)
 		{
 			const json_t *results_p = json_object_get (ckan_result_p, "results");
-			int count = -1;
+			json_int_t count = -1;
 
 			GetJSONInteger (ckan_result_p, "count", &count);
 
@@ -298,7 +298,7 @@ static bool ParseResultGroups (const json_t *groups_p, json_t *facet_counts_p)
 
 			if (facet_s)
 				{
-					int count;
+					json_int_t count;
 
 					if (GetJSONInteger (facet_counts_p, facet_s, &count))
 						{
