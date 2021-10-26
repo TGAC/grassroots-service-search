@@ -726,7 +726,7 @@ static void SearchKeyword (const char *keyword_s, const char *facet_s, const uin
 																	lucene_p -> lt_num_total_hits += num_results;
 																	lucene_p -> lt_hits_to_index += num_results;
 
-																}		/* if (json_is_array (docs_p)) */
+																}		/* if (json_is_array (ckan_results_p)) */
 
 														}		/* if (ckan_results_p) */
 
@@ -869,15 +869,26 @@ static bool AddSearchResultsFromLuceneResults (json_t *document_p, const uint32 
 										}
 									else
 										{
+											PrintErrors (STM_LEVEL_SEVERE, __FILE__, __LINE__, "AddResultToServiceJob () failed for \"%s\"", name_s);
 											json_decref (dest_record_p);
 										}
-
 								}		/* if (dest_record_p) */
+							else
+								{
+									PrintErrors (STM_LEVEL_SEVERE, __FILE__, __LINE__, "GetResourceAsJSONByParts () failed for \"%s\"", name_s);
+								}
 
 							json_decref (result_p);
 						}		/* if (result_p) */
-
+					else
+						{
+							PrintErrors (STM_LEVEL_SEVERE, __FILE__, __LINE__, "Failed to get \"result\" from document");
+						}
 				}		/* if (type_s) */
+			else
+				{
+					PrintErrors (STM_LEVEL_SEVERE, __FILE__, __LINE__, "Failed to get \"@type_s\" from document");
+				}
 
 		}		/* if (id_s) */
 	else

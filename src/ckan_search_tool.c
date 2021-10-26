@@ -267,7 +267,7 @@ static json_t *GetResult (const json_t *ckan_result_p, const char *ckan_url_s, c
 																									if (buffer_p)
 																										{
 																											size_t num_authors = json_array_size (authors_p);
-																											size_t i;
+																											size_t i = 0;
 																											bool loop_flag = true;
 																											bool authors_success_flag = true;
 																											bool first_entry_flag = true;
