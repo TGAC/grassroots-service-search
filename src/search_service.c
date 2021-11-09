@@ -86,6 +86,8 @@ static bool AddSearchResultsFromLuceneResults (json_t *document_p, const uint32 
 
 static Parameter *AddFacetParameter (ParameterSet *params_p, ParameterGroup *group_p, SearchServiceData *data_p);
 
+static bool IsCKANSearchEnabled (const char *facet_s, const SearchServiceData * const data_p);
+
 
 typedef struct
 {
@@ -601,6 +603,7 @@ static ParameterSet *IsResourceForSearchService (Service * UNUSED_PARAM (service
 }
 
 
+
 static void SearchKeyword (const char *keyword_s, const char *facet_s, const uint32 page_number, const uint32 page_size, ServiceJob *job_p,  SearchServiceData *data_p)
 {
 	OperationStatus status = OS_FAILED_TO_START;
@@ -655,7 +658,7 @@ static void SearchKeyword (const char *keyword_s, const char *facet_s, const uin
 
 									status = ParseLuceneResults (lucene_p, from, to, AddSearchResultsFromLuceneResults, &sd);
 
-									if (data_p -> ssd_ckan_url_s)
+									if (IsCKANSearchEnabled (facet_s, data_p))
 										{
 											json_t *ckan_p = SearchCKAN (keyword_s, data_p);
 
@@ -733,7 +736,8 @@ static void SearchKeyword (const char *keyword_s, const char *facet_s, const uin
 
 													json_decref (ckan_p);
 												}
-										}
+
+										}		/* if (IsCKANSearchEnabled (facet_s, data_p)) */
 
 
 									if ((status == OS_SUCCEEDED) || (status == OS_PARTIALLY_SUCCEEDED))
@@ -898,4 +902,31 @@ static bool AddSearchResultsFromLuceneResults (json_t *document_p, const uint32 
 
 	return success_flag;
 }
+
+
+static bool IsCKANSearchEnabled (const char *facet_s, const SearchServiceData * const data_p)
+{
+	bool ckan_flag = false;
+
+	if (data_p -> ssd_ckan_url_s)
+		{
+			/* What facets are we searching? */
+			if (facet_s != NULL)
+				{
+					const char * const CKAN_FACET_S = "Publication";
+
+					if (strcmp (facet_s, CKAN_FACET_S) == 0)
+						{
+							ckan_flag = true;
+						}
+				}
+			else
+				{
+					ckan_flag = true;
+
+				}
+		}
+	return ckan_flag;
+}
+
 
