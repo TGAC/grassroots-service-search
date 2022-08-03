@@ -31,7 +31,7 @@ static bool ParseResultGroups (const json_t *groups_p, json_t *facet_counts_p);
 json_t *SearchCKAN (const char *query_s, const SearchServiceData *data_p)
 {
 	json_t *grassroots_results_p = NULL;
-	CurlTool *curl_p = AllocateCurlTool (CM_MEMORY);
+	CurlTool *curl_p = AllocateMemoryCurlTool (0);
 
 	if (curl_p)
 		{
