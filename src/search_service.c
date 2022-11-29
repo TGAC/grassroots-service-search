@@ -647,7 +647,7 @@ static void SearchKeyword (const char *keyword_s, const char *facet_s, const uin
 				{
 					if (SetLuceneToolName (lucene_p, "search_keywords"))
 						{
-							if (SearchLucene (lucene_p, keyword_s, facets_p, "drill-down", page_number, page_size, QM_TERMS))
+							if (SearchLucene (lucene_p, keyword_s, facets_p, "drill-down", page_number, page_size, QM_PARSER))
 								{
 									SearchData sd;
 									const uint32 from = page_number * page_size;
