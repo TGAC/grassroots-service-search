@@ -63,7 +63,7 @@ static const char *GetSearchServiceAlias (const Service *service_p);
 
 static const char *GetSearchServiceInformationUri (const Service *service_p);
 
-static ParameterSet *GetSearchServiceParameters (Service *service_p, Resource *resource_p, UserDetails *user_p);
+static ParameterSet *GetSearchServiceParameters (Service *service_p, DataResource *resource_p, UserDetails *user_p);
 
 static bool GetSearchServiceParameterTypesForNamedParameters (const Service *service_p, const char *param_name_s, ParameterType *pt_p);
 
@@ -72,7 +72,7 @@ static void ReleaseSearchServiceParameters (Service *service_p, ParameterSet *pa
 
 static ServiceJobSet *RunSearchService (Service *service_p, ParameterSet *param_set_p, UserDetails *user_p, ProvidersStateTable *providers_p);
 
-static ParameterSet *IsResourceForSearchService (Service *service_p, Resource *resource_p, Handler *handler_p);
+static ParameterSet *IsResourceForSearchService (Service *service_p, DataResource *resource_p, Handler *handler_p);
 
 static bool CloseSearchService (Service *service_p);
 
@@ -266,7 +266,7 @@ static Parameter *AddFacetParameter (ParameterSet *params_p, ParameterGroup *gro
 }
 
 
-static ParameterSet *GetSearchServiceParameters (Service *service_p, Resource * UNUSED_PARAM (resource_p), UserDetails * UNUSED_PARAM (user_p))
+static ParameterSet *GetSearchServiceParameters (Service *service_p, DataResource * UNUSED_PARAM (resource_p), UserDetails * UNUSED_PARAM (user_p))
 {
 	ParameterSet *params_p = AllocateParameterSet ("search service parameters", "The parameters used for the  search service");
 
@@ -597,7 +597,7 @@ static ServiceMetadata *GetSearchServiceMetadata (Service * UNUSED_PARAM (servic
 }
 
 
-static ParameterSet *IsResourceForSearchService (Service * UNUSED_PARAM (service_p), Resource * UNUSED_PARAM (resource_p), Handler * UNUSED_PARAM (handler_p))
+static ParameterSet *IsResourceForSearchService (Service * UNUSED_PARAM (service_p), DataResource * UNUSED_PARAM (resource_p), Handler * UNUSED_PARAM (handler_p))
 {
 	return NULL;
 }
@@ -702,7 +702,7 @@ static void SearchKeyword (const char *keyword_s, const char *facet_s, const uin
 																		{
 																			json_t *ckan_result_p = json_array_get (ckan_results_p, i);
 																			const char *name_s = GetJSONString (ckan_result_p, "so:name");
-																			json_t *dest_record_p = GetResourceAsJSONByParts (PROTOCOL_INLINE_S, NULL, name_s, ckan_result_p);
+																			json_t *dest_record_p = GetDataResourceAsJSONByParts (PROTOCOL_INLINE_S, NULL, name_s, ckan_result_p);
 
 																			if (dest_record_p)
 																				{
@@ -863,7 +863,7 @@ static bool AddSearchResultsFromLuceneResults (json_t *document_p, const uint32 
 								}		/* if (strcmp (type_s, "Grassroots:Service") == 0) */
 
 
-							dest_record_p = GetResourceAsJSONByParts (PROTOCOL_INLINE_S, NULL, name_s, result_p);
+							dest_record_p = GetDataResourceAsJSONByParts (PROTOCOL_INLINE_S, NULL, name_s, result_p);
 
 							if (dest_record_p)
 								{
