@@ -68,16 +68,19 @@ json_t *SearchCKAN (const char *query_s, const SearchServiceData *data_p)
 																	if (!AppendStringsToByteBuffer (buffer_p, "&fq=", key_s, ":", value_s, NULL))
 																		{
 																			success_flag = false;
+																			PrintErrors (STM_LEVEL_SEVERE, __FILE__, __LINE__, "Failed to append \"&fq=\". \"%s\", \":\", \"%s\" to byte buffer", key_s, value_s);
 																		}
 																}
 															else
 																{
+																	PrintJSONToErrors (STM_LEVEL_SEVERE, __FILE__, __LINE__, filter_p, "Failed to get key");
 																	success_flag = false;
 																}
 
 														}
 													else
 														{
+															PrintJSONToErrors (STM_LEVEL_SEVERE, __FILE__, __LINE__, filter_p, "Failed to get value");
 															success_flag = false;
 														}
 
@@ -107,26 +110,58 @@ json_t *SearchCKAN (const char *query_s, const SearchServiceData *data_p)
 																			grassroots_results_p = ParseCKANResults (ckan_results_p, data_p -> ssd_ckan_url_s, data_p -> ssd_ckan_type_s, data_p -> ssd_ckan_type_description_s, data_p -> ssd_ckan_result_icon_s);
 																			json_decref (ckan_results_p);
 																		}
+																	else
+																		{
+																			PrintErrors (STM_LEVEL_SEVERE, __FILE__, __LINE__, "json_loads () failed for url \"%s\" with error at %d,%d \"%s\"\n\"%s\" from url_s", err.line, err.column, err.text, url_s, result_s);
+																		}
 
 																}		/* if (result_s) */
+															else
+																{
+																	PrintErrors (STM_LEVEL_SEVERE, __FILE__, __LINE__, "GetCurlToolData () failed for \"%s\"", url_s);
+																}
 
 														}		/* if (res == CURLE_OK) */
+													else
+														{
+															PrintErrors (STM_LEVEL_SEVERE, __FILE__, __LINE__, "RunCurlTool () Failed for \"%s\" with error code %d", url_s, res);
+														}
 
 												}		/* if (SetUriForCurlTool (curl_p, url_s)) */
+											else
+												{
+													PrintErrors (STM_LEVEL_SEVERE, __FILE__, __LINE__, "Failed to append \"%s\", \"/api/3/action/package_search?q=\" and \"%s\"", data_p -> ssd_ckan_url_s, query_s);
+												}
 
 										}		/* if (success_flag) */
 
 
 								}		/* if (AppendStringsToByteBuffer (buffer_p, ckan_search_url_s, "?q=", query_s, NULL)) */
+							else
+								{
+									PrintErrors (STM_LEVEL_SEVERE, __FILE__, __LINE__, "Failed to append \"%s\", \"/api/3/action/package_search?q=\" and \"%s\"", data_p -> ssd_ckan_url_s, query_s);
+								}
 
 						}		/* if (escaped_query_s) */
+					else
+						{
+							PrintErrors (STM_LEVEL_SEVERE, __FILE__, __LINE__, "Failed to get escaped query for \"%s\"", query_s);
+						}
 
 
 					FreeByteBuffer (buffer_p);
 				}		/* if (buffer_p) */
+			else
+				{
+					PrintErrors (STM_LEVEL_SEVERE, __FILE__, __LINE__, "Failed to allocate ByteBuffer for CKAN");
+				}
 
 			FreeCurlTool (curl_p);
 		}		/* if (curl_p) */
+	else
+		{
+			PrintErrors (STM_LEVEL_SEVERE, __FILE__, __LINE__, "Failed to allocate CurlTool for CKAN");
+		}
 
 	return grassroots_results_p;
 }
@@ -188,13 +223,19 @@ static json_t *ParseCKANResults (const json_t *ckan_results_p, const char *ckan_
 																}		/* if (json_object_set_new (res_p, "facets", facet_counts_p) == 0) */
 															else
 																{
+																	PrintJSONToErrors (STM_LEVEL_SEVERE, __FILE__, __LINE__, res_p, "Failed to add facet counts");
 																	json_decref (facet_counts_p);
 																}
 
 														}		/* if (facet_counts_p) */
+													else
+														{
+															PrintErrors (STM_LEVEL_SEVERE, __FILE__, __LINE__, "Failed to create facet counts");
+														}
 												}
 											else
 												{
+													PrintJSONToErrors (STM_LEVEL_SEVERE, __FILE__, __LINE__, res_p, "Failed to add results");
 													json_decref (grassroots_results_p);
 												}
 										}
@@ -204,11 +245,26 @@ static json_t *ParseCKANResults (const json_t *ckan_results_p, const char *ckan_
 										}
 
 								}		/* if (res_p) */
-
+							else
+								{
+									PrintErrors (STM_LEVEL_SEVERE, __FILE__, __LINE__, "Failed to create json object ()");
+								}
 
 						}
+					else
+						{
+							PrintJSONToErrors (STM_LEVEL_SEVERE, __FILE__, __LINE__, results_p, "Failed to get results is not an array");
+						}
+				}
+			else
+				{
+					PrintJSONToErrors (STM_LEVEL_SEVERE, __FILE__, __LINE__, ckan_result_p, "Failed to get results");
 				}
 
+		}
+	else
+		{
+			PrintJSONToErrors (STM_LEVEL_SEVERE, __FILE__, __LINE__, ckan_results_p, "Failed to get result");
 		}
 
 	return NULL;
@@ -253,7 +309,10 @@ static json_t *GetResult (const json_t *ckan_result_p, const char *ckan_url_s, c
 
 																			if (value_s)
 																				{
-																					SetJSONString (grassroots_result_p, INDEXING_DESCRIPTION_S, value_s);
+																					if (!SetJSONString (grassroots_result_p, INDEXING_DESCRIPTION_S, value_s))
+																						{
+																							PrintJSONToErrors (STM_LEVEL_WARNING, __FILE__, __LINE__, grassroots_result_p, "Failed to set \"%s\": \"%s\"", INDEXING_DESCRIPTION_S, value_s);
+																						}
 																				}
 
 																			value_s = GetJSONString (ckan_result_p, "author");
@@ -350,26 +409,59 @@ static json_t *GetResult (const json_t *ckan_result_p, const char *ckan_url_s, c
 																					 */
 																					if (!set_authors_flag)
 																						{
-																							SetJSONString (grassroots_result_p, AUTHORS_KEY_S, value_s);
+																							if (!SetJSONString (grassroots_result_p, AUTHORS_KEY_S, value_s))
+																								{
+																									PrintJSONToErrors (STM_LEVEL_WARNING, __FILE__, __LINE__, grassroots_result_p, "Failed to set \"%s\": \"%s\"", AUTHORS_KEY_S, value_s);
+																								}
 																						}
+																				}
+																			else
+																				{
+																					PrintJSONToErrors (STM_LEVEL_WARNING, __FILE__, __LINE__, grassroots_result_p, "No authors specified");
 																				}
 
 																			if (image_s)
 																				{
-																					SetJSONString (grassroots_result_p, INDEXING_ICON_URI_S, image_s);
+																					if (!SetJSONString (grassroots_result_p, INDEXING_ICON_URI_S, image_s))
+																						{
+																							PrintJSONToErrors (STM_LEVEL_WARNING, __FILE__, __LINE__, grassroots_result_p, "Failed to set \"%s\": \"%s\"", INDEXING_ICON_URI_S, image_s);
+																						}
 																				}
 
 																			if (groups_p)
 																				{
-																					ParseResultGroups (groups_p, facet_counts_p);
+																					if (ParseResultGroups (groups_p, facet_counts_p))
+																						{
+																							PrintJSONToErrors (STM_LEVEL_WARNING, __FILE__, __LINE__, groups_p, "ParseResultGroups () failed");
+																						}
 																				}
 
 																			success_flag = true;
 																		}
+																	else
+																		{
+																			PrintJSONToErrors (STM_LEVEL_WARNING, __FILE__, __LINE__, grassroots_result_p, "Failed to set \"%s\": \"%s\"", INDEXING_NAME_S, title_s);
+																		}
 
 																}
+															else
+																{
+																	PrintJSONToErrors (STM_LEVEL_WARNING, __FILE__, __LINE__, grassroots_result_p, "Failed to set \"%s\": \"%s\"", WEB_SERVICE_URL_S, url_s);
+																}
+														}
+													else
+														{
+															PrintJSONToErrors (STM_LEVEL_WARNING, __FILE__, __LINE__, grassroots_result_p, "Failed to set \"%s\": \"%s\"", LUCENE_ID_S, url_s);
 														}
 												}
+											else
+												{
+													PrintJSONToErrors (STM_LEVEL_WARNING, __FILE__, __LINE__, grassroots_result_p, "Failed to set \"%s\": \"%s\"", INDEXING_TYPE_DESCRIPTION_S, datatype_description_s);
+												}
+										}
+									else
+										{
+											PrintJSONToErrors (STM_LEVEL_WARNING, __FILE__, __LINE__, grassroots_result_p, "Failed to set \"%s\": \"%s\"", INDEXING_TYPE_S, datatype_s);
 										}
 
 									if (!success_flag)
@@ -378,10 +470,27 @@ static json_t *GetResult (const json_t *ckan_result_p, const char *ckan_url_s, c
 											grassroots_result_p = NULL;
 										}
 								}
+							else
+								{
+									PrintErrors (STM_LEVEL_WARNING, __FILE__, __LINE__, "Failed to allocate json for grassroots result");
+								}
 
+						}
+					else
+						{
+							PrintJSONToErrors (STM_LEVEL_WARNING, __FILE__, __LINE__, ckan_result_p, "no title key");
 						}
 
 				}
+			else
+				{
+					PrintErrors (STM_LEVEL_WARNING, __FILE__, __LINE__, "ConcatenateVarargsStrings failed for \"%s\", \"/dataset/\", \"%s\"", ckan_url_s, id_s);
+				}
+
+		}
+	else
+		{
+			PrintJSONToErrors (STM_LEVEL_WARNING, __FILE__, __LINE__, ckan_result_p, "no id key");
 		}
 
 	return grassroots_result_p;
