@@ -1,5 +1,5 @@
  
-# Search Services
+# Search Service
 
 The search service uses the [Grassroots Lucene library](https://github.com/TGAC/grassroots-lucene.git) to allow searches
 of all of the data and services within a Grassroots server. It also allows searching of external datasets and other data management systems such as [CKAN](https://ckan.org/).
