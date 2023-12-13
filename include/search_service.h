@@ -36,7 +36,7 @@ extern "C"
 #endif
 
 
-SEARCH_SERVICE_API ServicesArray *GetServices (UserDetails *user_p, GrassrootsServer *grassroots_p);
+SEARCH_SERVICE_API ServicesArray *GetServices (User *user_p, GrassrootsServer *grassroots_p);
 
 SEARCH_SERVICE_API void ReleaseServices (ServicesArray *services_p);
 
