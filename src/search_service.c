@@ -215,7 +215,7 @@ static const char *GetSearchServiceInformationUri (const Service *service_p)
 
 static Parameter *AddFacetParameter (ParameterSet *params_p, ParameterGroup *group_p, SearchServiceData *data_p)
 {
-	StringParameter *param_p = (StringParameter *) EasyCreateAndAddStringParameterToParameterSet (& (data_p -> ssd_base_data), params_p, group_p, S_FACET.npt_type, S_FACET.npt_name_s, "Type", "The type of data to search for", S_ANY_FACET_S, PL_ALL);
+	Parameter *param_p = EasyCreateAndAddStringParameterToParameterSet (& (data_p -> ssd_base_data), params_p, group_p, S_FACET.npt_type, S_FACET.npt_name_s, "Type", "The type of data to search for", S_ANY_FACET_S, PL_ALL);
 
 	if (param_p)
 		{
@@ -258,7 +258,7 @@ static Parameter *AddFacetParameter (ParameterSet *params_p, ParameterGroup *gro
 
 						}		/* if (data_p -> ssd_base_data.sd_config_p) */
 
-					return & (param_p -> sp_base_param);
+					return param_p;
 				}
 		}
 
