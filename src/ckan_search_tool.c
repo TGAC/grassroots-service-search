@@ -112,7 +112,7 @@ json_t *SearchCKAN (const char *query_s, const SearchServiceData *data_p)
 																		}
 																	else
 																		{
-																			PrintErrors (STM_LEVEL_SEVERE, __FILE__, __LINE__, "json_loads () failed for url \"%s\" with error at %d,%d \"%s\"\n\"%s\" from url_s", err.line, err.column, err.text, url_s, result_s);
+																			PrintErrors (STM_LEVEL_SEVERE, __FILE__, __LINE__, "json_loads () failed for url \"%s\" with error at %d,%d\n\"%s\"\n", url_s, err.line, err.column, err.text, result_s);
 																		}
 
 																}		/* if (result_s) */
