@@ -63,14 +63,14 @@ static const char *GetSearchServiceAlias (const Service *service_p);
 
 static const char *GetSearchServiceInformationUri (const Service *service_p);
 
-static ParameterSet *GetSearchServiceParameters (Service *service_p, DataResource *resource_p, UserDetails *user_p);
+static ParameterSet *GetSearchServiceParameters (Service *service_p, DataResource *resource_p, User *user_p);
 
 static bool GetSearchServiceParameterTypesForNamedParameters (const Service *service_p, const char *param_name_s, ParameterType *pt_p);
 
 
 static void ReleaseSearchServiceParameters (Service *service_p, ParameterSet *params_p);
 
-static ServiceJobSet *RunSearchService (Service *service_p, ParameterSet *param_set_p, UserDetails *user_p, ProvidersStateTable *providers_p);
+static ServiceJobSet *RunSearchService (Service *service_p, ParameterSet *param_set_p, User *user_p, ProvidersStateTable *providers_p);
 
 static ParameterSet *IsResourceForSearchService (Service *service_p, DataResource *resource_p, Handler *handler_p);
 
@@ -102,7 +102,7 @@ typedef struct
  */
 
 
-ServicesArray *GetServices (UserDetails *user_p, GrassrootsServer *grassroots_p)
+ServicesArray *GetServices (User *user_p, GrassrootsServer *grassroots_p)
 {
 	Service *service_p = GetSearchService (grassroots_p);
 
@@ -215,7 +215,7 @@ static const char *GetSearchServiceInformationUri (const Service *service_p)
 
 static Parameter *AddFacetParameter (ParameterSet *params_p, ParameterGroup *group_p, SearchServiceData *data_p)
 {
-	StringParameter *param_p = (StringParameter *) EasyCreateAndAddStringParameterToParameterSet (& (data_p -> ssd_base_data), params_p, group_p, S_FACET.npt_type, S_FACET.npt_name_s, "Type", "The type of data to search for", S_ANY_FACET_S, PL_ALL);
+	Parameter *param_p = EasyCreateAndAddStringParameterToParameterSet (& (data_p -> ssd_base_data), params_p, group_p, S_FACET.npt_type, S_FACET.npt_name_s, "Type", "The type of data to search for", S_ANY_FACET_S, PL_ALL);
 
 	if (param_p)
 		{
@@ -258,7 +258,7 @@ static Parameter *AddFacetParameter (ParameterSet *params_p, ParameterGroup *gro
 
 						}		/* if (data_p -> ssd_base_data.sd_config_p) */
 
-					return & (param_p -> sp_base_param);
+					return param_p;
 				}
 		}
 
@@ -266,7 +266,7 @@ static Parameter *AddFacetParameter (ParameterSet *params_p, ParameterGroup *gro
 }
 
 
-static ParameterSet *GetSearchServiceParameters (Service *service_p, DataResource * UNUSED_PARAM (resource_p), UserDetails * UNUSED_PARAM (user_p))
+static ParameterSet *GetSearchServiceParameters (Service *service_p, DataResource * UNUSED_PARAM (resource_p), User * UNUSED_PARAM (user_p))
 {
 	ParameterSet *params_p = AllocateParameterSet ("search service parameters", "The parameters used for the  search service");
 
@@ -371,7 +371,7 @@ static bool CloseSearchService (Service *service_p)
 }
 
 
-static ServiceJobSet *RunSearchService (Service *service_p, ParameterSet *param_set_p, UserDetails * UNUSED_PARAM (user_p), ProvidersStateTable * UNUSED_PARAM (providers_p))
+static ServiceJobSet *RunSearchService (Service *service_p, ParameterSet *param_set_p, User * UNUSED_PARAM (user_p), ProvidersStateTable * UNUSED_PARAM (providers_p))
 {
 	SearchServiceData *data_p = (SearchServiceData *) (service_p -> se_data_p);
 
