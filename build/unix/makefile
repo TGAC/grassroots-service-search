@@ -51,6 +51,7 @@ SRCS 	= \
 	ckan_search_tool.c \
 	search_service.c \
 	search_service_data.c \
+	zenodo_search_tool.c
 
 
 CPPFLAGS += -DSEARCH_SERVICE_EXPORTS 

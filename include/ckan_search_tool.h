@@ -12,10 +12,6 @@
 #include "search_service_library.h"
 
 
-#include "linked_list.h"
-
-
-
 #ifdef __cplusplus
 extern "C"
 {
