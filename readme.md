@@ -51,7 +51,6 @@ build the search service.
 
 Each of the three services listed above can be configured by files with the same names in the 
 `config` directory in the Grassroots application directory, *e.g.* `config/Search Grassroots`
->>>>>>> 2151817dd59466dab6a74a8e07a904b7085fad73
 
  * **facets**: This is an array of objects giving the details of the available databases. The objects in this array have the following keys:
     * **so:name**:  This is the name to show to the user for this database. 
