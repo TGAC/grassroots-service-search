@@ -18,7 +18,7 @@
 
 static json_t *GetResult (const json_t *zenodo_result_p, json_t *facet_counts_p, const SearchServiceData *data_p);
 
-static json_t *ParseZenodoResults (const json_t *zenodo_results_p, const SearchServiceData *data_p);
+static json_t *ParseZenodoResults (const json_t *zenodo_results_p, json_t *facet_counts_p, const SearchServiceData *data_p);
 
 static bool ParseResultGroups (const json_t *groups_p, json_t *facet_counts_p);
 
@@ -28,7 +28,7 @@ static bool ParseResultGroups (const json_t *groups_p, json_t *facet_counts_p);
  */
 
 
-json_t *SearchZenodo (const char *query_s, const SearchServiceData *data_p)
+json_t *SearchZenodo (const char *query_s, json_t *facet_counts_p, const SearchServiceData *data_p)
 {
 	json_t *grassroots_results_p = NULL;
 	CurlTool *curl_p = AllocateMemoryCurlTool (0);
@@ -78,7 +78,7 @@ json_t *SearchZenodo (const char *query_s, const SearchServiceData *data_p)
 
 																	if (zenodo_results_p)
 																		{
-																			grassroots_results_p = ParseZenodoResults (zenodo_results_p, data_p);
+																			grassroots_results_p = ParseZenodoResults (zenodo_results_p, facet_counts_p, data_p);
 																			json_decref (zenodo_results_p);
 																		}
 																	else
@@ -138,106 +138,75 @@ json_t *SearchZenodo (const char *query_s, const SearchServiceData *data_p)
 }
 
 
-static json_t *ParseZenodoResults (const json_t *zenodo_results_p, const SearchServiceData *data_p)
+static json_t *ParseZenodoResults (const json_t *zenodo_results_p, json_t *facet_counts_p, const SearchServiceData *data_p)
 {
-	const json_t *zenodo_hits_data_p = json_object_get (zenodo_results_p, "hits");
+	const json_t *zenodo_first_hits_data_p = json_object_get (zenodo_results_p, "hits");
 
-	if (zenodo_hits_data_p)
+	if (zenodo_first_hits_data_p)
 		{
-			const json_t *hits_p = json_object_get (zenodo_hits_data_p, "results");
-			json_int_t total = -1;
-
-			GetJSONInteger (zenodo_hits_data_p, "total", &total);
+			const json_t *hits_p = json_object_get (zenodo_first_hits_data_p, "hits");
 
 			if (hits_p)
 				{
+					json_int_t total = -1;
+
+					GetJSONInteger (zenodo_first_hits_data_p, "total", &total);
+
 					if (json_is_array (hits_p))
 						{
-							json_t *res_p = json_object ();
+							json_t *grassroots_results_p = json_array ();
 
-							if (res_p)
+							if (grassroots_results_p)
 								{
-									json_t *grassroots_results_p = json_array ();
+									size_t i;
+									const json_t *zenodo_hit_p;
 
-									if (grassroots_results_p)
+									json_array_foreach (hits_p, i, zenodo_hit_p)
 										{
-											if (json_object_set_new (res_p, "results", grassroots_results_p) == 0)
+											json_t *grassroots_result_p = GetResult (zenodo_hit_p, facet_counts_p, data_p);
+
+											if (grassroots_result_p)
 												{
-													json_t *facet_counts_p = json_object ();
-
-													if (facet_counts_p)
+													if (json_array_append_new (grassroots_results_p, grassroots_result_p) != 0)
 														{
-															if (json_object_set_new (res_p, "facets", facet_counts_p) == 0)
-																{
-																	size_t i;
-																	const json_t *zenodo_hit_p;
-
-																	json_array_foreach (hits_p, i, zenodo_hit_p)
-																		{
-																			json_t *grassroots_result_p = GetResult (zenodo_hit_p, facet_counts_p, data_p);
-
-																			if (grassroots_result_p)
-																				{
-																					if (json_array_append_new (grassroots_results_p, grassroots_result_p) != 0)
-																						{
-																							PrintJSONToErrors (STM_LEVEL_SEVERE, __FILE__, __LINE__, grassroots_result_p, "Failed to add grassroots result");
-																							json_decref (grassroots_result_p);
-																						}
-																				}
-																			else
-																				{
-																					PrintJSONToErrors (STM_LEVEL_SEVERE, __FILE__, __LINE__, zenodo_hit_p, "Failed to create grassroots result");
-																				}
-																		}
-
-																	return res_p;
-
-																}		/* if (json_object_set_new (res_p, "facets", facet_counts_p) == 0) */
-															else
-																{
-																	PrintJSONToErrors (STM_LEVEL_SEVERE, __FILE__, __LINE__, res_p, "Failed to add facet counts");
-																	json_decref (facet_counts_p);
-																}
-
-														}		/* if (facet_counts_p) */
-													else
-														{
-															PrintErrors (STM_LEVEL_SEVERE, __FILE__, __LINE__, "Failed to create facet counts");
+															PrintJSONToErrors (STM_LEVEL_SEVERE, __FILE__, __LINE__, grassroots_result_p, "Failed to add grassroots result");
+															json_decref (grassroots_result_p);
 														}
 												}
 											else
 												{
-													PrintJSONToErrors (STM_LEVEL_SEVERE, __FILE__, __LINE__, res_p, "Failed to add results");
-													json_decref (grassroots_results_p);
+													PrintJSONToErrors (STM_LEVEL_SEVERE, __FILE__, __LINE__, zenodo_hit_p, "Failed to create grassroots result");
 												}
 										}
-									else
-										{
-											PrintErrors (STM_LEVEL_SEVERE, __FILE__, __LINE__, "Failed to create grassroots results array");
-										}
 
-								}		/* if (res_p) */
+									return grassroots_results_p;
+
+								}
 							else
 								{
-									PrintErrors (STM_LEVEL_SEVERE, __FILE__, __LINE__, "Failed to create json object ()");
+									PrintErrors (STM_LEVEL_SEVERE, __FILE__, __LINE__, "Failed to create grassroots results array");
 								}
+
 
 						}
 					else
 						{
 							PrintJSONToErrors (STM_LEVEL_SEVERE, __FILE__, __LINE__, hits_p, "Failed to get results is not an array");
 						}
+
+
 				}
 			else
 				{
-					PrintJSONToErrors (STM_LEVEL_SEVERE, __FILE__, __LINE__, hits_p, "Failed to get results");
+					PrintJSONToErrors (STM_LEVEL_SEVERE, __FILE__, __LINE__, zenodo_first_hits_data_p, "Failed to get hits data");
 				}
 
-		}
+		}		/* if (zenodo_first_hits_data_p) */
 	else
 		{
-			PrintJSONToErrors (STM_LEVEL_SEVERE, __FILE__, __LINE__, zenodo_results_p, "Failed to get hits data");
+			PrintJSONToErrors (STM_LEVEL_SEVERE, __FILE__, __LINE__, zenodo_results_p, "Failed to get first hits data");
 		}
+
 
 	return NULL;
 }
@@ -252,219 +221,228 @@ static json_t *GetResult (const json_t *zenodo_result_p, json_t *facet_counts_p,
 
 	if (doi_url_s)
 		{
-			const char *title_s = GetJSONString (zenodo_result_p, "title");
+			char *url_s = ConcatenateVarargsStrings (data_p -> ssd_zenodo_url_s, doi_url_s, NULL);
 
-			if (title_s)
+			if (url_s)
 				{
-					grassroots_result_p = json_object ();
+					const char *title_s = GetJSONString (zenodo_result_p, "title");
 
-					if (grassroots_result_p)
+					if (title_s)
 						{
-							bool success_flag = false;
-							const json_t *metadata_p = json_object_get (zenodo_result_p, "metadata");
+							grassroots_result_p = json_object ();
 
-							if (metadata_p)
+							if (grassroots_result_p)
 								{
-									const json_t *resource_type_p = json_object_get (metadata_p, "resource_type");
-									const char *description_s = GetJSONString (metadata_p, "description");
-									const char *indexing_type_s = NULL;
-									const char *datatype_description_s = NULL;
-									const char *image_s = NULL;
+									bool success_flag = false;
+									const json_t *metadata_p = json_object_get (zenodo_result_p, "metadata");
 
-									if (description_s)
+									if (metadata_p)
 										{
-											if (!SetJSONString (grassroots_result_p, INDEXING_DESCRIPTION_S, description_s))
+											const json_t *resource_type_p = json_object_get (metadata_p, "resource_type");
+											const char *description_s = GetJSONString (metadata_p, "description");
+											const char *indexing_type_s = NULL;
+											const char *datatype_description_s = NULL;
+											const char *image_s = NULL;
+
+											if (description_s)
 												{
-													PrintJSONToErrors (STM_LEVEL_WARNING, __FILE__, __LINE__, grassroots_result_p, "Failed to set \"%s\": \"%s\"", INDEXING_DESCRIPTION_S, description_s);
-												}
-										}
-
-									if (resource_type_p)
-										{
-											/*
-												 The different resource types are:
-
-											    publication
-											    poster
-											    presentation
-											    dataset
-											    image
-											    video
-											    software
-											    lesson
-											    other
-											*/
-
-											const char *type_s = GetJSONString (resource_type_p, "type");
-
-											if (type_s)
-												{
-													if (data_p -> ssd_zenodo_resource_mappings_p)
+													if (!SetJSONString (grassroots_result_p, INDEXING_DESCRIPTION_S, description_s))
 														{
-															const json_t *resource_p = json_object_get (data_p -> ssd_zenodo_resource_mappings_p, type_s);
+															PrintJSONToErrors (STM_LEVEL_WARNING, __FILE__, __LINE__, grassroots_result_p, "Failed to set \"%s\": \"%s\"", INDEXING_DESCRIPTION_S, description_s);
+														}
+												}
 
-															if (resource_p)
+											if (resource_type_p)
+												{
+													/*
+														 The different resource types are:
+
+													    publication
+													    poster
+													    presentation
+													    dataset
+													    image
+													    video
+													    software
+													    lesson
+													    other
+													 */
+
+													const char *type_s = GetJSONString (resource_type_p, "type");
+
+													if (type_s)
+														{
+															if (data_p -> ssd_zenodo_resource_mappings_p)
 																{
-																	indexing_type_s = GetJSONString (resource_p, INDEXING_TYPE_S);
-																	datatype_description_s = GetJSONString (resource_p, INDEXING_TYPE_DESCRIPTION_S);
-																	image_s = GetJSONString (resource_p, INDEXING_ICON_URI_S);
+																	const json_t *resource_p = json_object_get (data_p -> ssd_zenodo_resource_mappings_p, type_s);
+
+																	if (resource_p)
+																		{
+																			indexing_type_s = GetJSONString (resource_p, INDEXING_TYPE_S);
+																			datatype_description_s = GetJSONString (resource_p, INDEXING_TYPE_DESCRIPTION_S);
+																			image_s = GetJSONString (resource_p, INDEXING_ICON_URI_S);
+																		}
+
 																}
 
 														}
 
 												}
 
-										}
 
 
-
-									if (SetJSONString (grassroots_result_p, INDEXING_TYPE_S, indexing_type_s))
-										{
-											if (SetJSONString (grassroots_result_p, INDEXING_TYPE_DESCRIPTION_S, datatype_description_s))
+											if (SetJSONString (grassroots_result_p, INDEXING_TYPE_S, indexing_type_s))
 												{
-													if (SetJSONString (grassroots_result_p, LUCENE_ID_S, doi_url_s))
+													if (SetJSONString (grassroots_result_p, INDEXING_TYPE_DESCRIPTION_S, datatype_description_s))
 														{
-															if (SetJSONString (grassroots_result_p, WEB_SERVICE_URL_S, doi_url_s))
+															if (SetJSONString (grassroots_result_p, LUCENE_ID_S, doi_url_s))
 																{
-																	if (SetJSONString (grassroots_result_p, INDEXING_NAME_S, title_s))
+																	if (SetJSONString (grassroots_result_p, WEB_SERVICE_URL_S, url_s))
 																		{
-																			json_t *authors_p = json_object_get (zenodo_result_p, "creators");
-
-																			if (authors_p)
+																			if (SetJSONString (grassroots_result_p, INDEXING_NAME_S, title_s))
 																				{
-																					if (json_is_array (authors_p))
+																					json_t *authors_p = json_object_get (metadata_p, "creators");
+
+																					if (authors_p)
 																						{
-																							ByteBuffer *buffer_p = AllocateByteBuffer (1024);
-
-																							if (buffer_p)
+																							if (json_is_array (authors_p))
 																								{
-																									size_t num_authors = json_array_size (authors_p);
-																									size_t i = 0;
-																									bool loop_flag = true;
-																									bool authors_success_flag = true;
-																									bool first_entry_flag = true;
-																									const char * const AUTHORS_KEY_S = "author";
+																									ByteBuffer *buffer_p = AllocateByteBuffer (1024);
 
-																									while (loop_flag && authors_success_flag)
+																									if (buffer_p)
 																										{
-																											json_t *entry_p = json_array_get (authors_p, i);
+																											size_t num_authors = json_array_size (authors_p);
+																											size_t i = 0;
+																											bool loop_flag = true;
+																											bool authors_success_flag = true;
+																											bool first_entry_flag = true;
+																											const char * const AUTHORS_KEY_S = "author";
 
-																											if (json_is_object (entry_p))
+																											while (loop_flag && authors_success_flag)
 																												{
-																													const char *name_s = GetJSONString (entry_p, "name");
+																													json_t *entry_p = json_array_get (authors_p, i);
 
-																													if (name_s)
+																													if (json_is_object (entry_p))
 																														{
-																															if (first_entry_flag)
-																																{
-																																	authors_success_flag = AppendStringToByteBuffer (buffer_p, name_s);
-																																	first_entry_flag = false;
-																																}
-																															else
-																																{
-																																	authors_success_flag = AppendStringsToByteBuffer (buffer_p, "; ", name_s, NULL);
-																																}
+																															const char *name_s = GetJSONString (entry_p, "name");
 
-																															if (!authors_success_flag)
+																															if (name_s)
 																																{
-																																	PrintErrors (STM_LEVEL_WARNING, __FILE__, __LINE__, "Failed to append \"%s\" to authors", name_s);
+																																	if (first_entry_flag)
+																																		{
+																																			authors_success_flag = AppendStringToByteBuffer (buffer_p, name_s);
+																																			first_entry_flag = false;
+																																		}
+																																	else
+																																		{
+																																			authors_success_flag = AppendStringsToByteBuffer (buffer_p, "; ", name_s, NULL);
+																																		}
+
+																																	if (!authors_success_flag)
+																																		{
+																																			PrintErrors (STM_LEVEL_WARNING, __FILE__, __LINE__, "Failed to append \"%s\" to authors", name_s);
+																																		}
 																																}
 																														}
-																												}
+
+																													if (authors_success_flag)
+																														{
+																															++ i;
+
+																															if (i == num_authors)
+																																{
+																																	loop_flag = false;
+																																}
+																														}
+																												}		/* while (loop_flag && success_flag */
 
 																											if (authors_success_flag)
 																												{
-																													++ i;
+																													const char *authors_s = GetByteBufferData (buffer_p);
 
-																													if (i == num_authors)
+																													if (!SetJSONString (grassroots_result_p, AUTHORS_KEY_S, authors_s))
 																														{
-																															loop_flag = false;
+																															PrintErrors (STM_LEVEL_WARNING, __FILE__, __LINE__, "Failed to set authors to \"%s\"", authors_s);
 																														}
 																												}
-																										}		/* while (loop_flag && success_flag */
 
-																									if (authors_success_flag)
-																										{
-																											const char *authors_s = GetByteBufferData (buffer_p);
-
-																											if (!SetJSONString (grassroots_result_p, AUTHORS_KEY_S, authors_s))
-																												{
-																													PrintErrors (STM_LEVEL_WARNING, __FILE__, __LINE__, "Failed to set authors to \"%s\"", authors_s);
-																												}
+																											FreeByteBuffer (buffer_p);
 																										}
 
-																									FreeByteBuffer (buffer_p);
+																								}		/* if (json_is_array (authors_p)) */
+																							else
+																								{
+																									PrintJSONToErrors (STM_LEVEL_WARNING, __FILE__, __LINE__, authors_p, "Authors is not a JSON array");
 																								}
 
-																						}		/* if (json_is_array (authors_p)) */
+																						}		/* if (authors_p) */
 																					else
 																						{
-																							PrintJSONToErrors (STM_LEVEL_WARNING, __FILE__, __LINE__, authors_p, "Authors is not a JSON array");
+																							PrintJSONToErrors (STM_LEVEL_WARNING, __FILE__, __LINE__, grassroots_result_p, "No authors specified");
 																						}
 
-																				}		/* if (authors_p) */
+																					if (image_s)
+																						{
+																							if (!SetJSONString (grassroots_result_p, INDEXING_ICON_URI_S, image_s))
+																								{
+																									PrintJSONToErrors (STM_LEVEL_WARNING, __FILE__, __LINE__, grassroots_result_p, "Failed to set \"%s\": \"%s\"", INDEXING_ICON_URI_S, image_s);
+																								}
+																						}
+
+																					success_flag = true;
+																				}
 																			else
 																				{
-																					PrintJSONToErrors (STM_LEVEL_WARNING, __FILE__, __LINE__, grassroots_result_p, "No authors specified");
+																					PrintJSONToErrors (STM_LEVEL_WARNING, __FILE__, __LINE__, grassroots_result_p, "Failed to set \"%s\": \"%s\"", INDEXING_NAME_S, title_s);
 																				}
 
-																			if (image_s)
-																				{
-																					if (!SetJSONString (grassroots_result_p, INDEXING_ICON_URI_S, image_s))
-																						{
-																							PrintJSONToErrors (STM_LEVEL_WARNING, __FILE__, __LINE__, grassroots_result_p, "Failed to set \"%s\": \"%s\"", INDEXING_ICON_URI_S, image_s);
-																						}
-																				}
-
-																			success_flag = true;
 																		}
 																	else
 																		{
-																			PrintJSONToErrors (STM_LEVEL_WARNING, __FILE__, __LINE__, grassroots_result_p, "Failed to set \"%s\": \"%s\"", INDEXING_NAME_S, title_s);
+																			PrintJSONToErrors (STM_LEVEL_WARNING, __FILE__, __LINE__, grassroots_result_p, "Failed to set \"%s\": \"%s\"", WEB_SERVICE_URL_S, doi_url_s);
 																		}
-
 																}
 															else
 																{
-																	PrintJSONToErrors (STM_LEVEL_WARNING, __FILE__, __LINE__, grassroots_result_p, "Failed to set \"%s\": \"%s\"", WEB_SERVICE_URL_S, doi_url_s);
+																	PrintJSONToErrors (STM_LEVEL_WARNING, __FILE__, __LINE__, grassroots_result_p, "Failed to set \"%s\": \"%s\"", LUCENE_ID_S, doi_url_s);
 																}
 														}
 													else
 														{
-															PrintJSONToErrors (STM_LEVEL_WARNING, __FILE__, __LINE__, grassroots_result_p, "Failed to set \"%s\": \"%s\"", LUCENE_ID_S, doi_url_s);
+															PrintJSONToErrors (STM_LEVEL_WARNING, __FILE__, __LINE__, grassroots_result_p, "Failed to set \"%s\": \"%s\"", INDEXING_TYPE_DESCRIPTION_S, datatype_description_s);
 														}
 												}
 											else
 												{
-													PrintJSONToErrors (STM_LEVEL_WARNING, __FILE__, __LINE__, grassroots_result_p, "Failed to set \"%s\": \"%s\"", INDEXING_TYPE_DESCRIPTION_S, datatype_description_s);
+													PrintJSONToErrors (STM_LEVEL_WARNING, __FILE__, __LINE__, grassroots_result_p, "Failed to set \"%s\": \"%s\"", INDEXING_TYPE_S, indexing_type_s);
 												}
-										}
+
+											if (!success_flag)
+												{
+													json_decref (grassroots_result_p);
+													grassroots_result_p = NULL;
+												}
+										}		/* if (metadata_p) */
 									else
 										{
-											PrintJSONToErrors (STM_LEVEL_WARNING, __FILE__, __LINE__, grassroots_result_p, "Failed to set \"%s\": \"%s\"", INDEXING_TYPE_S, indexing_type_s);
+											PrintJSONToErrors (STM_LEVEL_WARNING, __FILE__, __LINE__, zenodo_result_p, "no metadata");
 										}
-
-									if (!success_flag)
-										{
-											json_decref (grassroots_result_p);
-											grassroots_result_p = NULL;
-										}
-								}		/* if (metadata_p) */
+								}
 							else
 								{
-									PrintJSONToErrors (STM_LEVEL_WARNING, __FILE__, __LINE__, zenodo_result_p, "no metadata");
+									PrintErrors (STM_LEVEL_WARNING, __FILE__, __LINE__, "Failed to allocate json for grassroots result");
 								}
-						}
+
+						}		/* if (title_s) */
 					else
 						{
-							PrintErrors (STM_LEVEL_WARNING, __FILE__, __LINE__, "Failed to allocate json for grassroots result");
+							PrintJSONToErrors (STM_LEVEL_WARNING, __FILE__, __LINE__, zenodo_result_p, "no title key");
 						}
 
-				}		/* if (title_s) */
-			else
-				{
-					PrintJSONToErrors (STM_LEVEL_WARNING, __FILE__, __LINE__, zenodo_result_p, "no title key");
-				}
+					FreeCopiedString (url_s);
+				}		/* if (url_s) */
+
+
 
 		}		/* if (doi_url_s) */
 	else
@@ -483,28 +461,28 @@ static bool ParseResultGroups (const json_t *groups_p, json_t *facet_counts_p)
 	bool success_flag = true;
 
 	json_array_foreach (groups_p, i, group_p)
-		{
-			const char *facet_s = GetJSONString (group_p, "title");
+	{
+		const char *facet_s = GetJSONString (group_p, "title");
 
-			if (facet_s)
-				{
-					json_int_t count;
+		if (facet_s)
+			{
+				json_int_t count;
 
-					if (GetJSONInteger (facet_counts_p, facet_s, &count))
-						{
-							++ count;
-						}
-					else
-						{
-							count = 1;
-						}
+				if (GetJSONInteger (facet_counts_p, facet_s, &count))
+					{
+						++ count;
+					}
+				else
+					{
+						count = 1;
+					}
 
-					if (!SetJSONInteger (facet_counts_p, facet_s, count))
-						{
-							success_flag = false;
-						}
-				}
-		}
+				if (!SetJSONInteger (facet_counts_p, facet_s, count))
+					{
+						success_flag = false;
+					}
+			}
+	}
 
 	return success_flag;
 }

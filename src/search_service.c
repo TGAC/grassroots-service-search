@@ -23,6 +23,7 @@
 #include "search_service.h"
 
 #include "ckan_search_tool.h"
+#include "zenodo_search_tool.h"
 
 #include "unsigned_int_parameter.h"
 #include "string_parameter.h"
@@ -82,12 +83,16 @@ static ServiceMetadata *GetSearchServiceMetadata (Service *service_p);
 static void SearchKeyword (const char *keyword_s, const char *facet_s, const uint32 page_number, const uint32 page_size, ServiceJob *job_p, SearchServiceData *data_p);
 
 
-static bool AddSearchResultsFromLuceneResults (json_t *document_p, const uint32 index, void *data_p);
+static bool AddSearchResultsFromLuceneResults (const json_t *document_p, const uint32 index, void *data_p);
 
 static Parameter *AddFacetParameter (ParameterSet *params_p, ParameterGroup *group_p, SearchServiceData *data_p);
 
 static bool IsCKANSearchEnabled (const char *facet_s, const SearchServiceData * const data_p);
 
+static bool IsZenodoSearchEnabled (const char *facet_s, const SearchServiceData * const data_p);
+
+static OperationStatus CallSearchEndpoint (const char *keyword_s, json_t *facet_counts_p, json_t *(*search_fn) (const char *query_s, json_t *facet_counts_p, const SearchServiceData *data_p),
+																ServiceJob *job_p, LuceneTool *lucene_p, const SearchServiceData *data_p);
 
 typedef struct
 {
@@ -649,132 +654,205 @@ static void SearchKeyword (const char *keyword_s, const char *facet_s, const uin
 						{
 							if (SearchLucene (lucene_p, keyword_s, facets_p, "drill-down", page_number, page_size, QM_PARSER))
 								{
-									SearchData sd;
-									const uint32 from = page_number * page_size;
-									const uint32 to = from + page_size - 1;
+									json_t *facet_counts_p = json_object ();
 
-									sd.sd_service_data_p = data_p;
-									sd.sd_job_p = job_p;
-
-									status = ParseLuceneResults (lucene_p, from, to, AddSearchResultsFromLuceneResults, &sd);
-
-									if (IsCKANSearchEnabled (facet_s, data_p))
+									if (facet_counts_p)
 										{
-											json_t *ckan_p = SearchCKAN (keyword_s, data_p);
+											SearchData sd;
+											const uint32 from = page_number * page_size;
+											const uint32 to = from + page_size - 1;
 
-											if (ckan_p)
+											sd.sd_service_data_p = data_p;
+											sd.sd_job_p = job_p;
+
+											status = ParseLuceneResults (lucene_p, from, to, AddSearchResultsFromLuceneResults, &sd);
+
+											if (IsCKANSearchEnabled (facet_s, data_p))
 												{
-													const json_t *facet_counts_p = json_object_get (ckan_p, "facets");
-													const json_t *ckan_results_p = json_object_get (ckan_p, "results");
+													json_t *ckan_p = SearchCKAN (keyword_s, facet_counts_p, data_p);
 
-													/*
-													if (facet_counts_p)
+													if (ckan_p)
 														{
-															const char *key_s;
-															json_t *value_p;
+															const json_t *ckan_results_p = json_object_get (ckan_p, "results");
 
-															json_object_foreach (facet_counts_p, key_s, value_p)
+															/*
+															if (facet_counts_p)
 																{
-																	if (json_is_integer (value_p))
-																		{
-																			int count = json_integer_value (value_p);
+																	const char *key_s;
+																	json_t *value_p;
 
-																			AddFacetResultToLucene (lucene_p, key_s, count);
+																	json_object_foreach (facet_counts_p, key_s, value_p)
+																		{
+																			if (json_is_integer (value_p))
+																				{
+																					int count = json_integer_value (value_p);
+
+																					AddFacetResultToLucene (lucene_p, key_s, count);
+																				}
 																		}
 																}
-														}
-													*/
+															*/
 
-													if (ckan_results_p)
-														{
-															if (json_is_array (ckan_results_p))
+															if (ckan_results_p)
 																{
-																	const size_t num_results = json_array_size (ckan_results_p);
-																	size_t i = 0;
-																	size_t num_successes = 0;
-
-																	if (data_p -> ssd_ckan_type_description_s)
+																	if (json_is_array (ckan_results_p))
 																		{
-																			AddFacetResultToLucene (lucene_p, data_p -> ssd_ckan_type_description_s, num_results);
-																		}
+																			const size_t num_results = json_array_size (ckan_results_p);
+																			size_t i = 0;
+																			size_t num_successes = 0;
 
-																	while (i < num_results)
-																		{
-																			json_t *ckan_result_p = json_array_get (ckan_results_p, i);
-																			const char *name_s = GetJSONString (ckan_result_p, "so:name");
-																			json_t *dest_record_p = GetDataResourceAsJSONByParts (PROTOCOL_INLINE_S, NULL, name_s, ckan_result_p);
-
-																			if (dest_record_p)
+																			if (data_p -> ssd_ckan_type_description_s)
 																				{
-																					if (AddResultToServiceJob (job_p, dest_record_p))
+																					AddFacetResultToLucene (lucene_p, data_p -> ssd_ckan_type_description_s, num_results);
+																				}
+
+																			while (i < num_results)
+																				{
+																					json_t *ckan_result_p = json_array_get (ckan_results_p, i);
+																					const char *name_s = GetJSONString (ckan_result_p, "so:name");
+																					json_t *dest_record_p = GetDataResourceAsJSONByParts (PROTOCOL_INLINE_S, NULL, name_s, ckan_result_p);
+
+																					if (dest_record_p)
 																						{
-																							success_flag = true;
-																						}
-																					else
-																						{
-																							json_decref (dest_record_p);
-																						}
+																							if (AddResultToServiceJob (job_p, dest_record_p))
+																								{
+																									success_flag = true;
+																								}
+																							else
+																								{
+																									json_decref (dest_record_p);
+																								}
 
-																				}		/* if (dest_record_p) */
+																						}		/* if (dest_record_p) */
 
-																			++ i;
-																		}		/* while (loop_flag && success_flag) */
-
-
-																	if ((num_successes > 0) && (num_successes < num_results))
-																		{
-																			status = OS_PARTIALLY_SUCCEEDED;
-																		}
-
-																	lucene_p -> lt_num_total_hits += num_results;
-																	lucene_p -> lt_hits_to_index += num_results;
-
-																}		/* if (json_is_array (ckan_results_p)) */
-
-														}		/* if (ckan_results_p) */
+																					++ i;
+																				}		/* while (loop_flag && success_flag) */
 
 
-													json_decref (ckan_p);
-												}
+																			if ((num_successes > 0) && (num_successes < num_results))
+																				{
+																					status = OS_PARTIALLY_SUCCEEDED;
+																				}
 
-										}		/* if (IsCKANSearchEnabled (facet_s, data_p)) */
+																			lucene_p -> lt_num_total_hits += num_results;
+																			lucene_p -> lt_hits_to_index += num_results;
+
+																		}		/* if (json_is_array (ckan_results_p)) */
+
+																}		/* if (ckan_results_p) */
 
 
-									if ((status == OS_SUCCEEDED) || (status == OS_PARTIALLY_SUCCEEDED))
-										{
-											bool added_metadata_flag = false;
-											json_error_t error;
-											json_t *metadata_p = json_pack_ex (&error, 0, "{s:i,s:i,s:i}",
-																												 LT_NUM_TOTAL_HITS_S, lucene_p -> lt_num_total_hits,
-																												 LT_HITS_START_INDEX_S, lucene_p -> lt_hits_from_index,
-																												 LT_HITS_END_INDEX_S, lucene_p -> lt_hits_to_index);
-
-											if (metadata_p)
-												{
-													if (AddLuceneFacetResultsToJSON (lucene_p, metadata_p))
-														{
-															added_metadata_flag = true;
+															json_decref (ckan_p);
 														}
 
-													job_p -> sj_metadata_p = metadata_p;
-												}
+												}		/* if (IsCKANSearchEnabled (facet_s, data_p)) */
+
+
+											if (IsZenodoSearchEnabled (facet_s, data_p))
+												{
+													json_t *zenodo_p = SearchZenodo (keyword_s, facet_counts_p, data_p);
+
+													if (zenodo_p)
+														{
+															const json_t *zenodo_results_p = json_object_get (zenodo_p, "results");
+
+															if (zenodo_results_p)
+																{
+																	if (json_is_array (zenodo_results_p))
+																		{
+																			const size_t num_results = json_array_size (zenodo_results_p);
+																			size_t i = 0;
+																			size_t num_successes = 0;
+
+																			if (data_p -> ssd_ckan_type_description_s)
+																				{
+																					AddFacetResultToLucene (lucene_p, data_p -> ssd_ckan_type_description_s, num_results);
+																				}
+
+																			while (i < num_results)
+																				{
+																					json_t *zenodo_result_p = json_array_get (zenodo_results_p, i);
+																					const char *name_s = GetJSONString (zenodo_result_p, "so:name");
+																					json_t *dest_record_p = GetDataResourceAsJSONByParts (PROTOCOL_INLINE_S, NULL, name_s, zenodo_result_p);
+
+																					if (dest_record_p)
+																						{
+																							if (AddResultToServiceJob (job_p, dest_record_p))
+																								{
+																									success_flag = true;
+																								}
+																							else
+																								{
+																									json_decref (dest_record_p);
+																								}
+
+																						}		/* if (dest_record_p) */
+
+																					++ i;
+																				}		/* while (loop_flag && success_flag) */
+
+
+																			if ((num_successes > 0) && (num_successes < num_results))
+																				{
+																					status = OS_PARTIALLY_SUCCEEDED;
+																				}
+
+																			lucene_p -> lt_num_total_hits += num_results;
+																			lucene_p -> lt_hits_to_index += num_results;
+
+																		}		/* if (json_is_array (ckan_results_p)) */
+
+																}		/* if (ckan_results_p) */
+
+
+															json_decref (zenodo_p);
+														}
+
+												}		/* if (IsZenodoSearchEnabled (facet_s, data_p)) */
+
+
+											if ((status == OS_SUCCEEDED) || (status == OS_PARTIALLY_SUCCEEDED))
+												{
+													bool added_metadata_flag = false;
+													json_error_t error;
+													json_t *metadata_p = json_pack_ex (&error, 0, "{s:i,s:i,s:i}",
+																														 LT_NUM_TOTAL_HITS_S, lucene_p -> lt_num_total_hits,
+																														 LT_HITS_START_INDEX_S, lucene_p -> lt_hits_from_index,
+																														 LT_HITS_END_INDEX_S, lucene_p -> lt_hits_to_index);
+
+													if (metadata_p)
+														{
+															if (AddLuceneFacetResultsToJSON (lucene_p, metadata_p))
+																{
+																	added_metadata_flag = true;
+																}
+
+															job_p -> sj_metadata_p = metadata_p;
+														}
+													else
+														{
+															PrintErrors (STM_LEVEL_WARNING, __FILE__, __LINE__, "Failed to create metadata for lucene hits");
+														}
+
+													if ((!added_metadata_flag) && (status == OS_SUCCEEDED))
+														{
+															status = OS_PARTIALLY_SUCCEEDED;
+														}
+
+												}		/* if ((status == OS_SUCCEEDED) || (status == OS_PARTIALLY_SUCCEEDED)) */
 											else
 												{
-													PrintErrors (STM_LEVEL_WARNING, __FILE__, __LINE__, "Failed to create metadata for lucene hits");
+													const char *status_s = GetOperationStatusAsString (status);
+
+													PrintErrors (STM_LEVEL_WARNING, __FILE__, __LINE__, "ParseLuceneResults failed for \"%s\"", keyword_s);
 												}
 
-											if ((!added_metadata_flag) && (status == OS_SUCCEEDED))
-												{
-													status = OS_PARTIALLY_SUCCEEDED;
-												}
-
-										}		/* if ((status == OS_SUCCEEDED) || (status == OS_PARTIALLY_SUCCEEDED)) */
+										}		/* if (facet_counts_p) */
 									else
 										{
-											const char *status_s = GetOperationStatusAsString (status);
 
-											PrintErrors (STM_LEVEL_WARNING, __FILE__, __LINE__, "ParseLuceneResults failed for \"%s\"", keyword_s);
 										}
+
 
 								}		/* if (SearchLucene (lucene_p, keyword_s, facets_p, "drill-down", page_number, page_size)) */
 							else
@@ -813,7 +891,7 @@ static void SearchKeyword (const char *keyword_s, const char *facet_s, const uin
 
 
 
-static bool AddSearchResultsFromLuceneResults (json_t *document_p, const uint32 index, void *data_p)
+static bool AddSearchResultsFromLuceneResults (const json_t *document_p, const uint32 index, void *data_p)
 {
 	bool success_flag = false;
 	SearchData *search_data_p = (SearchData *) data_p;
@@ -929,4 +1007,103 @@ static bool IsCKANSearchEnabled (const char *facet_s, const SearchServiceData * 
 	return ckan_flag;
 }
 
+
+
+
+static bool IsZenodoSearchEnabled (const char *facet_s, const SearchServiceData * const data_p)
+{
+	if (data_p -> ssd_zenodo_url_s)
+		{
+			/* What facets are we searching? */
+			if (facet_s != NULL)
+				{
+					if (data_p -> ssd_zenodo_resource_mappings_p)
+						{
+							const char *key_s;
+							json_t *value_p;
+
+							json_object_foreach (data_p -> ssd_zenodo_resource_mappings_p, key_s, value_p)
+								{
+									const char *indexing_type_s = GetJSONString (value_p, INDEXING_TYPE_S);
+
+									if (indexing_type_s)
+										{
+											if (strcmp (indexing_type_s, facet_s) == 0)
+												{
+													return true;
+												}
+										}
+								}
+
+
+						}
+				}
+			else
+				{
+					return true;
+				}
+		}
+
+	return false;
+}
+
+
+
+static OperationStatus CallSearchEndpoint (const char *keyword_s, json_t *facet_counts_p, json_t *(*search_fn) (const char *query_s, json_t *facet_counts_p, const SearchServiceData *data_p),
+																ServiceJob *job_p, LuceneTool *lucene_p, const SearchServiceData *data_p)
+{
+	OperationStatus status = OS_FAILED;
+	json_t *results_p = search_fn (keyword_s, facet_counts_p, data_p);
+
+	if (results_p)
+		{
+
+			if (json_is_array (results_p))
+				{
+					const size_t num_results = json_array_size (results_p);
+					size_t i = 0;
+					size_t num_successes = 0;
+
+
+					while (i < num_results)
+						{
+							json_t *result_p = json_array_get (results_p, i);
+							const char *name_s = GetJSONString (result_p, "so:name");
+							json_t *dest_record_p = GetDataResourceAsJSONByParts (PROTOCOL_INLINE_S, NULL, name_s, result_p);
+
+							if (dest_record_p)
+								{
+									if (AddResultToServiceJob (job_p, dest_record_p))
+										{
+											++ num_successes;
+										}
+									else
+										{
+											json_decref (dest_record_p);
+										}
+
+								}		/* if (dest_record_p) */
+
+							++ i;
+						}		/* while (loop_flag && success_flag) */
+
+					if (num_successes == num_results)
+						{
+							status = OS_SUCCEEDED;
+						}
+					else if (num_successes > 0)
+						{
+							status = OS_PARTIALLY_SUCCEEDED;
+						}
+
+					lucene_p -> lt_num_total_hits += num_results;
+					lucene_p -> lt_hits_to_index += num_results;
+
+				}		/* if (json_is_array (ckan_results_p)) */
+
+			json_decref (results_p);
+		}
+
+	return status;
+}
 

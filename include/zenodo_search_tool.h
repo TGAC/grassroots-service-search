@@ -18,7 +18,7 @@ extern "C"
 #endif
 
 
-SEARCH_SERVICE_LOCAL json_t *SearchZenodo (const char *query_s, const SearchServiceData *data_p);
+SEARCH_SERVICE_LOCAL json_t *SearchZenodo (const char *query_s, json_t *facet_counts_p, const SearchServiceData *data_p);
 
 
 #ifdef __cplusplus

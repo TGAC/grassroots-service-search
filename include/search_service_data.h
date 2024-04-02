@@ -29,6 +29,7 @@
 #include "search_service_library.h"
 
 
+
 typedef struct SearchServiceData
 {
 	ServiceData ssd_base_data;

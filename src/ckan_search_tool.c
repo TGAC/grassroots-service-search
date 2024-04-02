@@ -18,7 +18,7 @@
 
 static json_t *GetResult (const json_t *ckan_result_p, const char *ckan_url_s, const char *datatype_s, const char *datatype_description_s, const char *image_s, json_t *facet_counts_p);
 
-static json_t *ParseCKANResults (const json_t *ckan_results_p, const char *ckan_url_s, const char *type_s, const char *type_description_s, const char *image_s);
+static json_t *ParseCKANResults (const json_t *ckan_results_p, json_t *facet_counts_p, const char *ckan_url_s, const char *type_s, const char *type_description_s, const char *image_s);
 
 static bool ParseResultGroups (const json_t *groups_p, json_t *facet_counts_p);
 
@@ -28,7 +28,7 @@ static bool ParseResultGroups (const json_t *groups_p, json_t *facet_counts_p);
  */
 
 
-json_t *SearchCKAN (const char *query_s, const SearchServiceData *data_p)
+json_t *SearchCKAN (const char *query_s, json_t *facet_counts_p, const SearchServiceData *data_p)
 {
 	json_t *grassroots_results_p = NULL;
 	CurlTool *curl_p = AllocateMemoryCurlTool (0);
@@ -107,7 +107,7 @@ json_t *SearchCKAN (const char *query_s, const SearchServiceData *data_p)
 
 																	if (ckan_results_p)
 																		{
-																			grassroots_results_p = ParseCKANResults (ckan_results_p, data_p -> ssd_ckan_url_s, data_p -> ssd_ckan_type_s, data_p -> ssd_ckan_type_description_s, data_p -> ssd_ckan_result_icon_s);
+																			grassroots_results_p = ParseCKANResults (ckan_results_p, facet_counts_p, data_p -> ssd_ckan_url_s, data_p -> ssd_ckan_type_s, data_p -> ssd_ckan_type_description_s, data_p -> ssd_ckan_result_icon_s);
 																			json_decref (ckan_results_p);
 																		}
 																	else
@@ -167,7 +167,7 @@ json_t *SearchCKAN (const char *query_s, const SearchServiceData *data_p)
 }
 
 
-static json_t *ParseCKANResults (const json_t *ckan_results_p, const char *ckan_url_s, const char *type_s, const char *type_description_s, const char *image_s)
+static json_t *ParseCKANResults (const json_t *ckan_results_p, json_t *facet_counts_p, const char *ckan_url_s, const char *type_s, const char *type_description_s, const char *image_s)
 {
 	const json_t *ckan_result_p = json_object_get (ckan_results_p, "result");
 
@@ -192,46 +192,29 @@ static json_t *ParseCKANResults (const json_t *ckan_results_p, const char *ckan_
 										{
 											if (json_object_set_new (res_p, "results", grassroots_results_p) == 0)
 												{
-													json_t *facet_counts_p = json_object ();
 
-													if (facet_counts_p)
+													size_t i;
+
+													json_array_foreach (results_p, i, ckan_result_p)
 														{
-															if (json_object_set_new (res_p, "facets", facet_counts_p) == 0)
+															json_t *grassroots_result_p = GetResult (ckan_result_p, ckan_url_s, type_s, type_description_s, image_s, facet_counts_p);
+
+															if (grassroots_result_p)
 																{
-																	size_t i;
-
-																	json_array_foreach (results_p, i, ckan_result_p)
+																	if (json_array_append_new (grassroots_results_p, grassroots_result_p) != 0)
 																		{
-																			json_t *grassroots_result_p = GetResult (ckan_result_p, ckan_url_s, type_s, type_description_s, image_s, facet_counts_p);
-
-																			if (grassroots_result_p)
-																				{
-																					if (json_array_append_new (grassroots_results_p, grassroots_result_p) != 0)
-																						{
-																							PrintJSONToErrors (STM_LEVEL_SEVERE, __FILE__, __LINE__, grassroots_result_p, "Failed to add grassroots result");
-																							json_decref (grassroots_result_p);
-																						}
-																				}
-																			else
-																				{
-																					PrintJSONToErrors (STM_LEVEL_SEVERE, __FILE__, __LINE__, ckan_result_p, "Failed to create grassroots result");
-																				}
+																			PrintJSONToErrors (STM_LEVEL_SEVERE, __FILE__, __LINE__, grassroots_result_p, "Failed to add grassroots result");
+																			json_decref (grassroots_result_p);
 																		}
-
-																	return res_p;
-
-																}		/* if (json_object_set_new (res_p, "facets", facet_counts_p) == 0) */
+																}
 															else
 																{
-																	PrintJSONToErrors (STM_LEVEL_SEVERE, __FILE__, __LINE__, res_p, "Failed to add facet counts");
-																	json_decref (facet_counts_p);
+																	PrintJSONToErrors (STM_LEVEL_SEVERE, __FILE__, __LINE__, ckan_result_p, "Failed to create grassroots result");
 																}
-
-														}		/* if (facet_counts_p) */
-													else
-														{
-															PrintErrors (STM_LEVEL_SEVERE, __FILE__, __LINE__, "Failed to create facet counts");
 														}
+
+													return res_p;
+
 												}
 											else
 												{
