@@ -11,6 +11,8 @@
 #include "search_service_data.h"
 #include "search_service_library.h"
 
+#include "lucene_tool.h"
+
 
 #ifdef __cplusplus
 extern "C"
@@ -18,7 +20,7 @@ extern "C"
 #endif
 
 
-SEARCH_SERVICE_LOCAL json_t *SearchCKAN (const char *query_s, json_t *facet_counts_p, const SearchServiceData *data_p);
+SEARCH_SERVICE_LOCAL json_t *SearchCKAN (const char *query_s, LuceneTool *lucene_p, const SearchServiceData *data_p);
 
 
 #ifdef __cplusplus

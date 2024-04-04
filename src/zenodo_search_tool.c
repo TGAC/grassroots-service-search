@@ -16,11 +16,9 @@
 #include "lucene_tool.h"
 
 
-static json_t *GetResult (const json_t *zenodo_result_p, json_t *facet_counts_p, const SearchServiceData *data_p);
+static json_t *GetResult (const json_t *zenodo_result_p, LuceneTool *lucene_p, const SearchServiceData *data_p);
 
-static json_t *ParseZenodoResults (const json_t *zenodo_results_p, json_t *facet_counts_p, const SearchServiceData *data_p);
-
-static bool ParseResultGroups (const json_t *groups_p, json_t *facet_counts_p);
+static json_t *ParseZenodoResults (const json_t *zenodo_results_p, LuceneTool *lucene_p, const SearchServiceData *data_p);
 
 
 /*
@@ -28,7 +26,7 @@ static bool ParseResultGroups (const json_t *groups_p, json_t *facet_counts_p);
  */
 
 
-json_t *SearchZenodo (const char *query_s, json_t *facet_counts_p, const SearchServiceData *data_p)
+json_t *SearchZenodo (const char *query_s, LuceneTool *lucene_p, const SearchServiceData *data_p)
 {
 	json_t *grassroots_results_p = NULL;
 	CurlTool *curl_p = AllocateMemoryCurlTool (0);
@@ -78,7 +76,7 @@ json_t *SearchZenodo (const char *query_s, json_t *facet_counts_p, const SearchS
 
 																	if (zenodo_results_p)
 																		{
-																			grassroots_results_p = ParseZenodoResults (zenodo_results_p, facet_counts_p, data_p);
+																			grassroots_results_p = ParseZenodoResults (zenodo_results_p, lucene_p, data_p);
 																			json_decref (zenodo_results_p);
 																		}
 																	else
@@ -138,7 +136,7 @@ json_t *SearchZenodo (const char *query_s, json_t *facet_counts_p, const SearchS
 }
 
 
-static json_t *ParseZenodoResults (const json_t *zenodo_results_p, json_t *facet_counts_p, const SearchServiceData *data_p)
+static json_t *ParseZenodoResults (const json_t *zenodo_results_p, LuceneTool *lucene_p, const SearchServiceData *data_p)
 {
 	const json_t *zenodo_first_hits_data_p = json_object_get (zenodo_results_p, "hits");
 
@@ -163,7 +161,7 @@ static json_t *ParseZenodoResults (const json_t *zenodo_results_p, json_t *facet
 
 									json_array_foreach (hits_p, i, zenodo_hit_p)
 										{
-											json_t *grassroots_result_p = GetResult (zenodo_hit_p, facet_counts_p, data_p);
+											json_t *grassroots_result_p = GetResult (zenodo_hit_p, lucene_p, data_p);
 
 											if (grassroots_result_p)
 												{
@@ -214,7 +212,7 @@ static json_t *ParseZenodoResults (const json_t *zenodo_results_p, json_t *facet
 
 
 
-static json_t *GetResult (const json_t *zenodo_result_p, json_t *facet_counts_p, const SearchServiceData *data_p)
+static json_t *GetResult (const json_t *zenodo_result_p, LuceneTool *lucene_p, const SearchServiceData *data_p)
 {
 	json_t *grassroots_result_p = NULL;
 	const char *doi_url_s = GetJSONString (zenodo_result_p, "doi");
@@ -272,6 +270,8 @@ static json_t *GetResult (const json_t *zenodo_result_p, json_t *facet_counts_p,
 
 													if (type_s)
 														{
+															const uint32 count = 1;
+
 															if (data_p -> ssd_zenodo_resource_mappings_p)
 																{
 																	const json_t *resource_p = json_object_get (data_p -> ssd_zenodo_resource_mappings_p, type_s);
@@ -279,11 +279,17 @@ static json_t *GetResult (const json_t *zenodo_result_p, json_t *facet_counts_p,
 																	if (resource_p)
 																		{
 																			indexing_type_s = GetJSONString (resource_p, INDEXING_TYPE_S);
-																			datatype_description_s = GetJSONString (resource_p, INDEXING_TYPE_DESCRIPTION_S);
+																			datatype_description_s = GetJSONString (resource_p, INDEXING_DESCRIPTION_S);
 																			image_s = GetJSONString (resource_p, INDEXING_ICON_URI_S);
 																		}
 
 																}
+
+															if (!AddFacetResultToLucene (lucene_p, datatype_description_s, 1))
+																{
+																	PrintErrors (STM_LEVEL_SEVERE, __FILE__, __LINE__, "Failed to add \"%s\": " UINT32_FMT " as lucene facet", type_s, count);
+																}
+
 
 														}
 
@@ -360,7 +366,28 @@ static json_t *GetResult (const json_t *zenodo_result_p, json_t *facet_counts_p,
 																												{
 																													const char *authors_s = GetByteBufferData (buffer_p);
 
-																													if (!SetJSONString (grassroots_result_p, AUTHORS_KEY_S, authors_s))
+																													if (SetJSONString (grassroots_result_p, AUTHORS_KEY_S, authors_s))
+																														{
+																															if (data_p -> ssd_zenodo_provider_p)
+																																{
+																																	if (json_object_set (grassroots_result_p, SERVER_PROVIDER_S, data_p -> ssd_zenodo_provider_p) != 0)
+																																		{
+																																			PrintJSONToErrors (STM_LEVEL_WARNING, __FILE__, __LINE__, grassroots_result_p, "Failed to set \"%s\" object", SERVER_PROVIDER_S);
+																																		}
+																																}
+
+																															if (image_s)
+																																{
+																																	if (!SetJSONString (grassroots_result_p, INDEXING_ICON_URI_S, image_s))
+																																		{
+																																			PrintJSONToErrors (STM_LEVEL_WARNING, __FILE__, __LINE__, grassroots_result_p, "Failed to set \"%s\": \"%s\"", INDEXING_ICON_URI_S, image_s);
+																																		}
+																																}
+
+																														}
+
+
+																													else
 																														{
 																															PrintErrors (STM_LEVEL_WARNING, __FILE__, __LINE__, "Failed to set authors to \"%s\"", authors_s);
 																														}
@@ -381,13 +408,6 @@ static json_t *GetResult (const json_t *zenodo_result_p, json_t *facet_counts_p,
 																							PrintJSONToErrors (STM_LEVEL_WARNING, __FILE__, __LINE__, grassroots_result_p, "No authors specified");
 																						}
 
-																					if (image_s)
-																						{
-																							if (!SetJSONString (grassroots_result_p, INDEXING_ICON_URI_S, image_s))
-																								{
-																									PrintJSONToErrors (STM_LEVEL_WARNING, __FILE__, __LINE__, grassroots_result_p, "Failed to set \"%s\": \"%s\"", INDEXING_ICON_URI_S, image_s);
-																								}
-																						}
 
 																					success_flag = true;
 																				}
@@ -454,35 +474,3 @@ static json_t *GetResult (const json_t *zenodo_result_p, json_t *facet_counts_p,
 }
 
 
-static bool ParseResultGroups (const json_t *groups_p, json_t *facet_counts_p)
-{
-	size_t i;
-	const json_t *group_p;
-	bool success_flag = true;
-
-	json_array_foreach (groups_p, i, group_p)
-	{
-		const char *facet_s = GetJSONString (group_p, "title");
-
-		if (facet_s)
-			{
-				json_int_t count;
-
-				if (GetJSONInteger (facet_counts_p, facet_s, &count))
-					{
-						++ count;
-					}
-				else
-					{
-						count = 1;
-					}
-
-				if (!SetJSONInteger (facet_counts_p, facet_s, count))
-					{
-						success_flag = false;
-					}
-			}
-	}
-
-	return success_flag;
-}

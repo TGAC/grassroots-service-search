@@ -16,11 +16,12 @@
 #include "lucene_tool.h"
 
 
-static json_t *GetResult (const json_t *ckan_result_p, const char *ckan_url_s, const char *datatype_s, const char *datatype_description_s, const char *image_s, json_t *facet_counts_p);
+static json_t *GetResult (const json_t *ckan_result_p, LuceneTool *lucene_p, const SearchServiceData *data_p);
 
-static json_t *ParseCKANResults (const json_t *ckan_results_p, json_t *facet_counts_p, const char *ckan_url_s, const char *type_s, const char *type_description_s, const char *image_s);
+static json_t *ParseCKANResults (const json_t *ckan_results_p, LuceneTool *lucene_p, const SearchServiceData *data_p);
 
-static bool ParseResultGroups (const json_t *groups_p, json_t *facet_counts_p);
+
+static bool ParseResultGroups (json_t *grassroots_result_p, const json_t *groups_p, LuceneTool *lucene_p, const SearchServiceData *data_p);
 
 
 /*
@@ -28,7 +29,7 @@ static bool ParseResultGroups (const json_t *groups_p, json_t *facet_counts_p);
  */
 
 
-json_t *SearchCKAN (const char *query_s, json_t *facet_counts_p, const SearchServiceData *data_p)
+json_t *SearchCKAN (const char *query_s, LuceneTool *lucene_p, const SearchServiceData *data_p)
 {
 	json_t *grassroots_results_p = NULL;
 	CurlTool *curl_p = AllocateMemoryCurlTool (0);
@@ -107,7 +108,7 @@ json_t *SearchCKAN (const char *query_s, json_t *facet_counts_p, const SearchSer
 
 																	if (ckan_results_p)
 																		{
-																			grassroots_results_p = ParseCKANResults (ckan_results_p, facet_counts_p, data_p -> ssd_ckan_url_s, data_p -> ssd_ckan_type_s, data_p -> ssd_ckan_type_description_s, data_p -> ssd_ckan_result_icon_s);
+																			grassroots_results_p = ParseCKANResults (ckan_results_p, lucene_p, data_p);
 																			json_decref (ckan_results_p);
 																		}
 																	else
@@ -167,7 +168,7 @@ json_t *SearchCKAN (const char *query_s, json_t *facet_counts_p, const SearchSer
 }
 
 
-static json_t *ParseCKANResults (const json_t *ckan_results_p, json_t *facet_counts_p, const char *ckan_url_s, const char *type_s, const char *type_description_s, const char *image_s)
+static json_t *ParseCKANResults (const json_t *ckan_results_p, LuceneTool *lucene_p, const SearchServiceData *data_p)
 {
 	const json_t *ckan_result_p = json_object_get (ckan_results_p, "result");
 
@@ -190,37 +191,28 @@ static json_t *ParseCKANResults (const json_t *ckan_results_p, json_t *facet_cou
 
 									if (grassroots_results_p)
 										{
-											if (json_object_set_new (res_p, "results", grassroots_results_p) == 0)
+
+											size_t i;
+
+											json_array_foreach (results_p, i, ckan_result_p)
 												{
+													json_t *grassroots_result_p = GetResult (ckan_result_p, lucene_p, data_p);
 
-													size_t i;
-
-													json_array_foreach (results_p, i, ckan_result_p)
+													if (grassroots_result_p)
 														{
-															json_t *grassroots_result_p = GetResult (ckan_result_p, ckan_url_s, type_s, type_description_s, image_s, facet_counts_p);
-
-															if (grassroots_result_p)
+															if (json_array_append_new (grassroots_results_p, grassroots_result_p) != 0)
 																{
-																	if (json_array_append_new (grassroots_results_p, grassroots_result_p) != 0)
-																		{
-																			PrintJSONToErrors (STM_LEVEL_SEVERE, __FILE__, __LINE__, grassroots_result_p, "Failed to add grassroots result");
-																			json_decref (grassroots_result_p);
-																		}
-																}
-															else
-																{
-																	PrintJSONToErrors (STM_LEVEL_SEVERE, __FILE__, __LINE__, ckan_result_p, "Failed to create grassroots result");
+																	PrintJSONToErrors (STM_LEVEL_SEVERE, __FILE__, __LINE__, grassroots_result_p, "Failed to add grassroots result");
+																	json_decref (grassroots_result_p);
 																}
 														}
-
-													return res_p;
-
+													else
+														{
+															PrintJSONToErrors (STM_LEVEL_SEVERE, __FILE__, __LINE__, ckan_result_p, "Failed to create grassroots result");
+														}
 												}
-											else
-												{
-													PrintJSONToErrors (STM_LEVEL_SEVERE, __FILE__, __LINE__, res_p, "Failed to add results");
-													json_decref (grassroots_results_p);
-												}
+
+											return grassroots_results_p;
 										}
 									else
 										{
@@ -256,14 +248,14 @@ static json_t *ParseCKANResults (const json_t *ckan_results_p, json_t *facet_cou
 
 
 
-static json_t *GetResult (const json_t *ckan_result_p, const char *ckan_url_s, const char *datatype_s, const char *datatype_description_s, const char *image_s, json_t *facet_counts_p)
+static json_t *GetResult (const json_t *ckan_result_p, LuceneTool *lucene_p, const SearchServiceData *data_p)
 {
 	json_t *grassroots_result_p = NULL;
 	const char *id_s = GetJSONString (ckan_result_p, "id");
 
 	if (id_s)
 		{
-			char *url_s = ConcatenateVarargsStrings (ckan_url_s, "/dataset/", id_s, NULL);
+			char *url_s = ConcatenateVarargsStrings (data_p -> ssd_ckan_url_s, "/dataset/", id_s, NULL);
 
 			if (url_s)
 				{
@@ -277,10 +269,6 @@ static json_t *GetResult (const json_t *ckan_result_p, const char *ckan_url_s, c
 								{
 									bool success_flag = false;
 
-									if (SetJSONString (grassroots_result_p, INDEXING_TYPE_S, datatype_s))
-										{
-											if (SetJSONString (grassroots_result_p, INDEXING_TYPE_DESCRIPTION_S, datatype_description_s))
-												{
 													if (SetJSONString (grassroots_result_p, LUCENE_ID_S, url_s))
 														{
 															if (SetJSONString (grassroots_result_p, WEB_SERVICE_URL_S, url_s))
@@ -403,17 +391,26 @@ static json_t *GetResult (const json_t *ckan_result_p, const char *ckan_url_s, c
 																					PrintJSONToErrors (STM_LEVEL_WARNING, __FILE__, __LINE__, grassroots_result_p, "No authors specified");
 																				}
 
-																			if (image_s)
+																			if (data_p -> ssd_ckan_result_icon_s)
 																				{
-																					if (!SetJSONString (grassroots_result_p, INDEXING_ICON_URI_S, image_s))
+																					if (!SetJSONString (grassroots_result_p, INDEXING_ICON_URI_S, data_p -> ssd_ckan_result_icon_s))
 																						{
-																							PrintJSONToErrors (STM_LEVEL_WARNING, __FILE__, __LINE__, grassroots_result_p, "Failed to set \"%s\": \"%s\"", INDEXING_ICON_URI_S, image_s);
+																							PrintJSONToErrors (STM_LEVEL_WARNING, __FILE__, __LINE__, grassroots_result_p, "Failed to set \"%s\": \"%s\"", INDEXING_ICON_URI_S, data_p -> ssd_ckan_result_icon_s);
 																						}
 																				}
 
+																			if (data_p -> ssd_ckan_provider_p)
+																				{
+																					if (json_object_set (grassroots_result_p, SERVER_PROVIDER_S, data_p -> ssd_ckan_provider_p) != 0)
+																						{
+																							PrintJSONToErrors (STM_LEVEL_WARNING, __FILE__, __LINE__, grassroots_result_p, "Failed to set \"%s\" object", SERVER_PROVIDER_S);
+																						}
+																				}
+
+
 																			if (groups_p)
 																				{
-																					if (ParseResultGroups (groups_p, facet_counts_p))
+																					if (ParseResultGroups (grassroots_result_p, groups_p, lucene_p, data_p))
 																						{
 																							PrintJSONToErrors (STM_LEVEL_WARNING, __FILE__, __LINE__, groups_p, "ParseResultGroups () failed");
 																						}
@@ -436,16 +433,6 @@ static json_t *GetResult (const json_t *ckan_result_p, const char *ckan_url_s, c
 														{
 															PrintJSONToErrors (STM_LEVEL_WARNING, __FILE__, __LINE__, grassroots_result_p, "Failed to set \"%s\": \"%s\"", LUCENE_ID_S, url_s);
 														}
-												}
-											else
-												{
-													PrintJSONToErrors (STM_LEVEL_WARNING, __FILE__, __LINE__, grassroots_result_p, "Failed to set \"%s\": \"%s\"", INDEXING_TYPE_DESCRIPTION_S, datatype_description_s);
-												}
-										}
-									else
-										{
-											PrintJSONToErrors (STM_LEVEL_WARNING, __FILE__, __LINE__, grassroots_result_p, "Failed to set \"%s\": \"%s\"", INDEXING_TYPE_S, datatype_s);
-										}
 
 									if (!success_flag)
 										{
@@ -467,7 +454,7 @@ static json_t *GetResult (const json_t *ckan_result_p, const char *ckan_url_s, c
 				}
 			else
 				{
-					PrintErrors (STM_LEVEL_WARNING, __FILE__, __LINE__, "ConcatenateVarargsStrings failed for \"%s\", \"/dataset/\", \"%s\"", ckan_url_s, id_s);
+					PrintErrors (STM_LEVEL_WARNING, __FILE__, __LINE__, "ConcatenateVarargsStrings failed for \"%s\", \"/dataset/\", \"%s\"", data_p -> ssd_ckan_url_s, id_s);
 				}
 
 		}
@@ -480,7 +467,7 @@ static json_t *GetResult (const json_t *ckan_result_p, const char *ckan_url_s, c
 }
 
 
-static bool ParseResultGroups (const json_t *groups_p, json_t *facet_counts_p)
+static bool ParseResultGroups (json_t *grassroots_result_p, const json_t *groups_p, LuceneTool *lucene_p, const SearchServiceData *data_p)
 {
 	size_t i;
 	const json_t *group_p;
@@ -488,26 +475,43 @@ static bool ParseResultGroups (const json_t *groups_p, json_t *facet_counts_p)
 
 	json_array_foreach (groups_p, i, group_p)
 		{
-			const char *facet_s = GetJSONString (group_p, "title");
+			const char *type_s = GetJSONString (group_p, "title");
 
-			if (facet_s)
+			if (data_p -> ssd_ckan_resource_mappings_p)
 				{
-					json_int_t count;
+					const json_t *resource_p = json_object_get (data_p -> ssd_ckan_resource_mappings_p, type_s);
 
-					if (GetJSONInteger (facet_counts_p, facet_s, &count))
+					if (resource_p)
 						{
-							++ count;
+							const char *indexing_type_s = GetJSONString (resource_p, INDEXING_TYPE_S);
+							const char *datatype_description_s = GetJSONString (resource_p, INDEXING_DESCRIPTION_S);
+							const char *image_s = GetJSONString (resource_p, INDEXING_ICON_URI_S);
+
+
+							if (SetJSONString (grassroots_result_p, INDEXING_TYPE_S, indexing_type_s))
+								{
+									if (SetJSONString (grassroots_result_p, INDEXING_TYPE_DESCRIPTION_S, datatype_description_s))
+										{
+											if (!AddFacetResultToLucene (lucene_p, datatype_description_s, 1))
+												{
+													const uint32 count = 1;
+
+													PrintErrors (STM_LEVEL_SEVERE, __FILE__, __LINE__, "Failed to add \"%s\": " UINT32_FMT " as lucene facet", indexing_type_s, count);
+												}
+
+										}
+
+								}
+
 						}
 					else
 						{
-							count = 1;
+							PrintJSONToErrors (STM_LEVEL_SEVERE, __FILE__, __LINE__, group_p, "Unknown type \"%s\"", type_s);
 						}
 
-					if (!SetJSONInteger (facet_counts_p, facet_s, count))
-						{
-							success_flag = false;
-						}
 				}
+
+
 		}
 
 	return success_flag;

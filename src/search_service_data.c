@@ -42,17 +42,9 @@ bool ConfigureSearchServiceData (SearchServiceData *data_p)
 
 					if (data_p -> ssd_ckan_url_s)
 						{
-							const json_t *mapping_p = json_object_get (ckan_p, "datatype");
+							data_p -> ssd_ckan_resource_mappings_p = json_object_get (ckan_p, "mappings");
 
-							if (mapping_p)
-								{
-									data_p -> ssd_ckan_type_s = GetJSONString (mapping_p, INDEXING_TYPE_S);
-									data_p -> ssd_ckan_type_description_s = GetJSONString (mapping_p, INDEXING_TYPE_DESCRIPTION_S);
-									data_p -> ssd_ckan_result_icon_s = GetJSONString (mapping_p, INDEXING_ICON_URI_S);
-								}
-
-							data_p -> ssd_ckan_provider_name_s = GetJSONString (ckan_p, CONTEXT_PREFIX_SCHEMA_ORG_S "name");
-							data_p -> ssd_ckan_provider_icon_s = GetJSONString (ckan_p, CONTEXT_PREFIX_SCHEMA_ORG_S "image");
+							data_p -> ssd_ckan_provider_p = json_object_get (ckan_p, SERVER_PROVIDER_S);
 							data_p -> ssd_ckan_filters_p = json_object_get (ckan_p, "filters");
 						}
 				}
@@ -63,8 +55,7 @@ bool ConfigureSearchServiceData (SearchServiceData *data_p)
 
 					if (data_p -> ssd_zenodo_url_s)
 						{
-							data_p -> ssd_zenodo_provider_name_s = GetJSONString (zenodo_p, CONTEXT_PREFIX_SCHEMA_ORG_S "name");
-							data_p -> ssd_zenodo_provider_icon_s = GetJSONString (zenodo_p, CONTEXT_PREFIX_SCHEMA_ORG_S "image");
+							data_p -> ssd_zenodo_provider_p = json_object_get (zenodo_p, SERVER_PROVIDER_S);
 							data_p -> ssd_zenodo_community_s = GetJSONString (zenodo_p, "community");
 							data_p -> ssd_zenodo_api_token_s = GetJSONString (zenodo_p, "api_token");
 

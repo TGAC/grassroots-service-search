@@ -35,19 +35,15 @@ typedef struct SearchServiceData
 	ServiceData ssd_base_data;
 	const char *ssd_ckan_url_s;
 	const json_t *ssd_ckan_filters_p;
-	const char *ssd_ckan_type_s;
-	const char *ssd_ckan_type_description_s;
+	const json_t *ssd_ckan_resource_mappings_p;
 	const char *ssd_ckan_result_icon_s;
-
-	const char *ssd_ckan_provider_name_s;
-	const char *ssd_ckan_provider_icon_s;
+	const json_t *ssd_ckan_provider_p;
 
 	const char *ssd_zenodo_url_s;
 	const char *ssd_zenodo_community_s;
-	const char *ssd_zenodo_provider_name_s;
-	const char *ssd_zenodo_provider_icon_s;
 	const char *ssd_zenodo_api_token_s;
 	const json_t *ssd_zenodo_resource_mappings_p;
+	const json_t *ssd_zenodo_provider_p;
 
 } SearchServiceData;
 
