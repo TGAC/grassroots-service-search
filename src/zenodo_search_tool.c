@@ -264,42 +264,52 @@ static json_t *GetResult (const json_t *zenodo_result_p, LuceneTool *lucene_p, c
 													    software
 													    lesson
 													    other
+
+													   If the type hasn't been specified, default to other
 													 */
-
+													const char * const DEFAULT_TYPE_S = "other";
 													const char *type_s = GetJSONString (resource_type_p, "type");
+													const uint32 count = 1;
 
-													if (type_s)
+													if (!type_s)
 														{
-															const uint32 count = 1;
+															type_s = DEFAULT_TYPE_S;
+														}
 
-															if (data_p -> ssd_zenodo_resource_mappings_p)
+
+													if (data_p -> ssd_zenodo_resource_mappings_p)
+														{
+															const json_t *resource_p = json_object_get (data_p -> ssd_zenodo_resource_mappings_p, type_s);
+
+															if (resource_p)
 																{
-																	const json_t *resource_p = json_object_get (data_p -> ssd_zenodo_resource_mappings_p, type_s);
-
-																	if (resource_p)
-																		{
-																			indexing_type_s = GetJSONString (resource_p, INDEXING_TYPE_S);
-																			datatype_description_s = GetJSONString (resource_p, INDEXING_DESCRIPTION_S);
-																			image_s = GetJSONString (resource_p, INDEXING_ICON_URI_S);
-																		}
-
+																	indexing_type_s = GetJSONString (resource_p, INDEXING_TYPE_S);
+																	datatype_description_s = GetJSONString (resource_p, INDEXING_DESCRIPTION_S);
+																	image_s = GetJSONString (resource_p, INDEXING_ICON_URI_S);
 																}
 
+														}
+
+
+													if (datatype_description_s)
+														{
 															if (!AddFacetResultToLucene (lucene_p, datatype_description_s, 1))
 																{
 																	PrintErrors (STM_LEVEL_SEVERE, __FILE__, __LINE__, "Failed to add \"%s\": " UINT32_FMT " as lucene facet", type_s, count);
 																}
-
-
+														}
+													else
+														{
+															PrintErrors (STM_LEVEL_WARNING, __FILE__, __LINE__, "No datatype description for facet \"%s\"", type_s);
 														}
 
 												}
 
 
 
-											if (SetJSONString (grassroots_result_p, INDEXING_TYPE_S, indexing_type_s))
+											if ((indexing_type_s == NULL) || (SetJSONString (grassroots_result_p, INDEXING_TYPE_S, indexing_type_s)))
 												{
-													if (SetJSONString (grassroots_result_p, INDEXING_TYPE_DESCRIPTION_S, datatype_description_s))
+													if ((datatype_description_s == NULL) || (SetJSONString (grassroots_result_p, INDEXING_TYPE_DESCRIPTION_S, datatype_description_s)))
 														{
 															if (SetJSONString (grassroots_result_p, LUCENE_ID_S, doi_url_s))
 																{
