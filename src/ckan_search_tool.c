@@ -269,170 +269,170 @@ static json_t *GetResult (const json_t *ckan_result_p, LuceneTool *lucene_p, con
 								{
 									bool success_flag = false;
 
-													if (SetJSONString (grassroots_result_p, LUCENE_ID_S, url_s))
+									if (SetJSONString (grassroots_result_p, LUCENE_ID_S, url_s))
+										{
+											if (SetJSONString (grassroots_result_p, WEB_SERVICE_URL_S, url_s))
+												{
+													if (SetJSONString (grassroots_result_p, INDEXING_NAME_S, title_s))
 														{
-															if (SetJSONString (grassroots_result_p, WEB_SERVICE_URL_S, url_s))
+															json_t *groups_p = json_object_get (ckan_result_p, "groups");
+															const char *value_s = GetJSONString (ckan_result_p, "notes");
+
+															if (value_s)
 																{
-																	if (SetJSONString (grassroots_result_p, INDEXING_NAME_S, title_s))
+																	if (!SetJSONString (grassroots_result_p, INDEXING_DESCRIPTION_S, value_s))
 																		{
-																			json_t *groups_p = json_object_get (ckan_result_p, "groups");
-																			const char *value_s = GetJSONString (ckan_result_p, "notes");
+																			PrintJSONToErrors (STM_LEVEL_WARNING, __FILE__, __LINE__, grassroots_result_p, "Failed to set \"%s\": \"%s\"", INDEXING_DESCRIPTION_S, value_s);
+																		}
+																}
 
-																			if (value_s)
+															value_s = GetJSONString (ckan_result_p, "author");
+															if (value_s)
+																{
+																	/*
+																	 * Is it a json object as some ckan plugins
+																	 * can return json.
+																	 */
+																	json_error_t err;
+																	json_t *authors_p = json_loads (value_s, 0, &err);
+																	bool set_authors_flag = false;
+																	const char * const AUTHORS_KEY_S = "author";
+
+																	if (authors_p)
+																		{
+																			if (json_is_array (authors_p))
 																				{
-																					if (!SetJSONString (grassroots_result_p, INDEXING_DESCRIPTION_S, value_s))
-																						{
-																							PrintJSONToErrors (STM_LEVEL_WARNING, __FILE__, __LINE__, grassroots_result_p, "Failed to set \"%s\": \"%s\"", INDEXING_DESCRIPTION_S, value_s);
-																						}
-																				}
+																					ByteBuffer *buffer_p = AllocateByteBuffer (1024);
 
-																			value_s = GetJSONString (ckan_result_p, "author");
-																			if (value_s)
-																				{
-																					/*
-																					 * Is it a json object as some ckan plugins
-																					 * can return json.
-																					 */
-																					json_error_t err;
-																					json_t *authors_p = json_loads (value_s, 0, &err);
-																					bool set_authors_flag = false;
-																					const char * const AUTHORS_KEY_S = "author";
-
-																					if (authors_p)
+																					if (buffer_p)
 																						{
-																							if (json_is_array (authors_p))
+																							size_t num_authors = json_array_size (authors_p);
+																							size_t i = 0;
+																							bool loop_flag = true;
+																							bool authors_success_flag = true;
+																							bool first_entry_flag = true;
+
+																							while (loop_flag && authors_success_flag)
 																								{
-																									ByteBuffer *buffer_p = AllocateByteBuffer (1024);
+																									json_t *entry_p = json_array_get (authors_p, i);
 
-																									if (buffer_p)
+																									if (json_is_object (entry_p))
 																										{
-																											size_t num_authors = json_array_size (authors_p);
-																											size_t i = 0;
-																											bool loop_flag = true;
-																											bool authors_success_flag = true;
-																											bool first_entry_flag = true;
+																											const char *name_s = GetJSONString (entry_p, "name");
 
-																											while (loop_flag && authors_success_flag)
+																											if (name_s)
 																												{
-																													json_t *entry_p = json_array_get (authors_p, i);
-
-																													if (json_is_object (entry_p))
+																													if (first_entry_flag)
 																														{
-																															const char *name_s = GetJSONString (entry_p, "name");
-
-																															if (name_s)
-																																{
-																																	if (first_entry_flag)
-																																		{
-																																			authors_success_flag = AppendStringToByteBuffer (buffer_p, name_s);
-																																			first_entry_flag = false;
-																																		}
-																																	else
-																																		{
-																																			authors_success_flag = AppendStringsToByteBuffer (buffer_p, "; ", name_s, NULL);
-																																		}
-
-																																	if (!authors_success_flag)
-																																		{
-																																			PrintErrors (STM_LEVEL_WARNING, __FILE__, __LINE__, "Failed to append \"%s\" to authors", name_s);
-																																		}
-																																}
+																															authors_success_flag = AppendStringToByteBuffer (buffer_p, name_s);
+																															first_entry_flag = false;
+																														}
+																													else
+																														{
+																															authors_success_flag = AppendStringsToByteBuffer (buffer_p, "; ", name_s, NULL);
 																														}
 
-																													if (authors_success_flag)
+																													if (!authors_success_flag)
 																														{
-																															++ i;
-
-																															if (i == num_authors)
-																																{
-																																	loop_flag = false;
-																																}
-																														}
-																												}		/* while (loop_flag && success_flag */
-
-																											if (authors_success_flag)
-																												{
-																													const char *authors_s = GetByteBufferData (buffer_p);
-
-																													set_authors_flag = SetJSONString (grassroots_result_p, AUTHORS_KEY_S, authors_s);
-
-																													if (!set_authors_flag)
-																														{
-																															PrintErrors (STM_LEVEL_WARNING, __FILE__, __LINE__, "Failed to set authors to \"%s\"", authors_s);
+																															PrintErrors (STM_LEVEL_WARNING, __FILE__, __LINE__, "Failed to append \"%s\" to authors", name_s);
 																														}
 																												}
-
-																											FreeByteBuffer (buffer_p);
 																										}
 
-																								}		/* if (json_is_array (authors_p)) */
-																							else
+																									if (authors_success_flag)
+																										{
+																											++ i;
+
+																											if (i == num_authors)
+																												{
+																													loop_flag = false;
+																												}
+																										}
+																								}		/* while (loop_flag && success_flag */
+
+																							if (authors_success_flag)
 																								{
-																									PrintJSONToErrors (STM_LEVEL_WARNING, __FILE__, __LINE__, authors_p, "Authors is not a JSON array");
+																									const char *authors_s = GetByteBufferData (buffer_p);
+
+																									set_authors_flag = SetJSONString (grassroots_result_p, AUTHORS_KEY_S, authors_s);
+
+																									if (!set_authors_flag)
+																										{
+																											PrintErrors (STM_LEVEL_WARNING, __FILE__, __LINE__, "Failed to set authors to \"%s\"", authors_s);
+																										}
 																								}
 
-																							json_decref (authors_p);
-																						}		/* if (authors_p) */
-
-																					/*
-																					 * If we didn't manage to set it from a json object
-																					 * just set it as a string
-																					 */
-																					if (!set_authors_flag)
-																						{
-																							if (!SetJSONString (grassroots_result_p, AUTHORS_KEY_S, value_s))
-																								{
-																									PrintJSONToErrors (STM_LEVEL_WARNING, __FILE__, __LINE__, grassroots_result_p, "Failed to set \"%s\": \"%s\"", AUTHORS_KEY_S, value_s);
-																								}
+																							FreeByteBuffer (buffer_p);
 																						}
-																				}
+
+																				}		/* if (json_is_array (authors_p)) */
 																			else
 																				{
-																					PrintJSONToErrors (STM_LEVEL_WARNING, __FILE__, __LINE__, grassroots_result_p, "No authors specified");
+																					PrintJSONToErrors (STM_LEVEL_WARNING, __FILE__, __LINE__, authors_p, "Authors is not a JSON array");
 																				}
 
-																			if (data_p -> ssd_ckan_result_icon_s)
-																				{
-																					if (!SetJSONString (grassroots_result_p, INDEXING_ICON_URI_S, data_p -> ssd_ckan_result_icon_s))
-																						{
-																							PrintJSONToErrors (STM_LEVEL_WARNING, __FILE__, __LINE__, grassroots_result_p, "Failed to set \"%s\": \"%s\"", INDEXING_ICON_URI_S, data_p -> ssd_ckan_result_icon_s);
-																						}
-																				}
+																			json_decref (authors_p);
+																		}		/* if (authors_p) */
 
-																			if (data_p -> ssd_ckan_provider_p)
-																				{
-																					if (json_object_set (grassroots_result_p, SERVER_PROVIDER_S, data_p -> ssd_ckan_provider_p) != 0)
-																						{
-																							PrintJSONToErrors (STM_LEVEL_WARNING, __FILE__, __LINE__, grassroots_result_p, "Failed to set \"%s\" object", SERVER_PROVIDER_S);
-																						}
-																				}
-
-
-																			if (groups_p)
-																				{
-																					if (ParseResultGroups (grassroots_result_p, groups_p, lucene_p, data_p))
-																						{
-																							PrintJSONToErrors (STM_LEVEL_WARNING, __FILE__, __LINE__, groups_p, "ParseResultGroups () failed");
-																						}
-																				}
-
-																			success_flag = true;
-																		}
-																	else
+																	/*
+																	 * If we didn't manage to set it from a json object
+																	 * just set it as a string
+																	 */
+																	if (!set_authors_flag)
 																		{
-																			PrintJSONToErrors (STM_LEVEL_WARNING, __FILE__, __LINE__, grassroots_result_p, "Failed to set \"%s\": \"%s\"", INDEXING_NAME_S, title_s);
+																			if (!SetJSONString (grassroots_result_p, AUTHORS_KEY_S, value_s))
+																				{
+																					PrintJSONToErrors (STM_LEVEL_WARNING, __FILE__, __LINE__, grassroots_result_p, "Failed to set \"%s\": \"%s\"", AUTHORS_KEY_S, value_s);
+																				}
 																		}
-
 																}
 															else
 																{
-																	PrintJSONToErrors (STM_LEVEL_WARNING, __FILE__, __LINE__, grassroots_result_p, "Failed to set \"%s\": \"%s\"", WEB_SERVICE_URL_S, url_s);
+																	PrintJSONToErrors (STM_LEVEL_WARNING, __FILE__, __LINE__, grassroots_result_p, "No authors specified");
 																}
+
+															if (data_p -> ssd_ckan_result_icon_s)
+																{
+																	if (!SetJSONString (grassroots_result_p, INDEXING_ICON_URI_S, data_p -> ssd_ckan_result_icon_s))
+																		{
+																			PrintJSONToErrors (STM_LEVEL_WARNING, __FILE__, __LINE__, grassroots_result_p, "Failed to set \"%s\": \"%s\"", INDEXING_ICON_URI_S, data_p -> ssd_ckan_result_icon_s);
+																		}
+																}
+
+															if (data_p -> ssd_ckan_provider_p)
+																{
+																	if (json_object_set (grassroots_result_p, SERVER_PROVIDER_S, data_p -> ssd_ckan_provider_p) != 0)
+																		{
+																			PrintJSONToErrors (STM_LEVEL_WARNING, __FILE__, __LINE__, grassroots_result_p, "Failed to set \"%s\" object", SERVER_PROVIDER_S);
+																		}
+																}
+
+
+															if (groups_p)
+																{
+																	if (ParseResultGroups (grassroots_result_p, groups_p, lucene_p, data_p))
+																		{
+																			PrintJSONToErrors (STM_LEVEL_WARNING, __FILE__, __LINE__, groups_p, "ParseResultGroups () failed");
+																		}
+																}
+
+															success_flag = true;
 														}
 													else
 														{
-															PrintJSONToErrors (STM_LEVEL_WARNING, __FILE__, __LINE__, grassroots_result_p, "Failed to set \"%s\": \"%s\"", LUCENE_ID_S, url_s);
+															PrintJSONToErrors (STM_LEVEL_WARNING, __FILE__, __LINE__, grassroots_result_p, "Failed to set \"%s\": \"%s\"", INDEXING_NAME_S, title_s);
 														}
+
+												}
+											else
+												{
+													PrintJSONToErrors (STM_LEVEL_WARNING, __FILE__, __LINE__, grassroots_result_p, "Failed to set \"%s\": \"%s\"", WEB_SERVICE_URL_S, url_s);
+												}
+										}
+									else
+										{
+											PrintJSONToErrors (STM_LEVEL_WARNING, __FILE__, __LINE__, grassroots_result_p, "Failed to set \"%s\": \"%s\"", LUCENE_ID_S, url_s);
+										}
 
 									if (!success_flag)
 										{

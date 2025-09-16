@@ -91,7 +91,7 @@ static bool IsCKANSearchEnabled (const char *facet_s, const SearchServiceData * 
 
 static bool IsZenodoSearchEnabled (const char *facet_s, const SearchServiceData * const data_p);
 
-static OperationStatus CallSearchEndpoint (const char *keyword_s, json_t *facet_counts_p, json_t *(*search_fn) (const char *query_s, json_t *facet_counts_p, const SearchServiceData *data_p),
+static OperationStatus CallSearchEndpoint (const char *keyword_s, json_t *facet_counts_p, json_t *(*search_fn) (const char *query_s, LuceneTool *lucene_p, const SearchServiceData *data_p),
 																ServiceJob *job_p, LuceneTool *lucene_p, const SearchServiceData *data_p);
 
 typedef struct
@@ -665,7 +665,7 @@ static void SearchKeyword (const char *keyword_s, const char *facet_s, const uin
 
 									if (IsCKANSearchEnabled (facet_s, data_p))
 										{
-											OperationStatus status = CallSearchEndpoint (keyword_s, lucene_p, SearchCKAN, job_p, lucene_p, data_p);
+											OperationStatus search_status = CallSearchEndpoint (keyword_s, lucene_p, SearchCKAN, job_p, lucene_p, data_p);
 
 											MergeServiceJobStatus (job_p, status);
 										}		/* if (IsCKANSearchEnabled (facet_s, data_p)) */
@@ -673,7 +673,7 @@ static void SearchKeyword (const char *keyword_s, const char *facet_s, const uin
 
 									if (IsZenodoSearchEnabled (facet_s, data_p))
 										{
-											OperationStatus status = CallSearchEndpoint (keyword_s, lucene_p, SearchZenodo, job_p, lucene_p, data_p);
+											OperationStatus search_status = CallSearchEndpoint (keyword_s, lucene_p, SearchZenodo, job_p, lucene_p, data_p);
 
 											MergeServiceJobStatus (job_p, status);
 										}		/* if (IsZenodoSearchEnabled (facet_s, data_p)) */
@@ -941,7 +941,7 @@ static bool IsZenodoSearchEnabled (const char *facet_s, const SearchServiceData 
 
 
 
-static OperationStatus CallSearchEndpoint (const char *keyword_s, json_t *facet_counts_p, json_t *(*search_fn) (const char *query_s, json_t *facet_counts_p, const SearchServiceData *data_p),
+static OperationStatus CallSearchEndpoint (const char *keyword_s, json_t *facet_counts_p, json_t *(*search_fn) (const char *query_s, LuceneTool *lucene_p, const SearchServiceData *data_p),
 																ServiceJob *job_p, LuceneTool *lucene_p, const SearchServiceData *data_p)
 {
 	OperationStatus status = OS_FAILED;
